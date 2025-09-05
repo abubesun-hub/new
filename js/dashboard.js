@@ -116,6 +116,8 @@ class DashboardManager {
         this.updateElement('totalUSD', this.formatCurrency(stats.remaining.USD, 'USD'));
         this.updateElement('totalIQD', this.formatCurrency(stats.remaining.IQD, 'IQD'));
         this.updateElement('totalRevenue', this.formatCurrency(stats.revenue.USD, 'USD'));
+    // New IQD revenue card (sum of capital in IQD)
+    this.updateElement('totalRevenueIQD', this.formatCurrency(stats.revenue.IQD, 'IQD'));
         this.updateElement('totalExpenses', this.formatCurrency(stats.expenses.USD, 'USD'));
 
         // Update additional statistics if elements exist
