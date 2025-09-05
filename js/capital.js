@@ -503,7 +503,11 @@ class CapitalManager {
             return '<p class="text-muted text-center">لا يوجد مساهمون مسجلون</p>';
         }
 
-        // Calculate each shareholder's contribution
+    // Determine USD->IQD conversion rate (can be set in settings)
+    const settings = StorageManager.getData(StorageManager.STORAGE_KEYS.SETTINGS) || {};
+    const usdToIqd = parseFloat(settings.usdToIqd) || 1460; // default rate if not set
+
+    // Calculate each shareholder's contribution
         const shareholderContributions = shareholders.map(shareholder => {
             const contributions = capital.filter(entry => entry.shareholderId === shareholder.id);
             let totalUSD = 0;
@@ -526,6 +530,11 @@ class CapitalManager {
             };
         });
 
+        // Compute total combined capital in IQD (convert USD -> IQD) for percentage calculations
+        const totalCombinedIQD = shareholderContributions.reduce((sum, s) => {
+            return sum + (parseFloat(s.totalIQD) || 0) + ((parseFloat(s.totalUSD) || 0) * usdToIqd);
+        }, 0);
+
         return `
             <div class="table-responsive">
                 <table class="table table-hover">
@@ -535,19 +544,25 @@ class CapitalManager {
                             <th>المنصب</th>
                             <th>المساهمة بالدولار</th>
                             <th>المساهمة بالدينار</th>
+                            <th>النسبة %</th>
                             <th>عدد الإدخالات</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${shareholderContributions.map(shareholder => `
+                        ${shareholderContributions.map(shareholder => {
+                            // calculate combined value in IQD for percent
+                            const shareCombinedIQD = (parseFloat(shareholder.totalIQD) || 0) + ((parseFloat(shareholder.totalUSD) || 0) * usdToIqd);
+                            const percent = totalCombinedIQD > 0 ? ((shareCombinedIQD / totalCombinedIQD) * 100).toFixed(1) : '0.0';
+                            return `
                             <tr>
                                 <td>${shareholder.name}</td>
                                 <td>${shareholder.position}</td>
                                 <td>${this.formatCurrency(shareholder.totalUSD, 'USD')}</td>
                                 <td>${this.formatCurrency(shareholder.totalIQD, 'IQD')}</td>
+                                <td title="مبني على معدل تحويل ${usdToIqd} د.ع لكل دولار">${percent}%</td>
                                 <td><span class="badge bg-info">${shareholder.contributionsCount}</span></td>
                             </tr>
-                        `).join('')}
+                        `}).join('')}
                     </tbody>
                 </table>
             </div>
