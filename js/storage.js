@@ -16,6 +16,66 @@ class StorageManager {
     static init() {
         this.createBackup();
         this.initializeDefaultData();
+        // Ensure default admin user exists so login works immediately
+        try {
+            this.ensureAdminUser();
+        } catch (err) {
+            console.warn('ensureAdminUser failed:', err);
+        }
+    }
+
+    // Simple hash matching AuthManager.simpleHash to enable creating admin before AuthManager loads
+    static simpleHash(str) {
+        let hash = 0;
+        if (!str || str.length === 0) return hash.toString();
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash;
+        }
+        return Math.abs(hash).toString(16);
+    }
+
+    // Ensure admin user exists in storage and has hashed password
+    static ensureAdminUser() {
+        try {
+            let users = this.getData(this.STORAGE_KEYS.USERS) || [];
+            if (!Array.isArray(users)) users = [];
+
+            let adminUser = users.find(u => u.username === 'admin');
+            const salt = 'default-salt';
+            if (!adminUser) {
+                adminUser = {
+                    id: this.generateId(),
+                    username: 'admin',
+                    password: this.simpleHash('admin123' + salt),
+                    salt: salt,
+                    name: 'المدير العام',
+                    role: 'admin',
+                    permissions: ['all'],
+                    isActive: true,
+                    createdAt: new Date().toISOString()
+                };
+                users.push(adminUser);
+                this.saveData(this.STORAGE_KEYS.USERS, users);
+                console.log('StorageManager: created default admin user');
+            } else {
+                // normalize admin password and salt if needed
+                if (!adminUser.salt || !adminUser.password || adminUser.password === 'admin123') {
+                    adminUser.salt = adminUser.salt || salt;
+                    adminUser.password = this.simpleHash('admin123' + adminUser.salt);
+                    adminUser.isActive = true;
+                    const idx = users.findIndex(u => u.username === 'admin');
+                    if (idx !== -1) {
+                        users[idx] = adminUser;
+                        this.saveData(this.STORAGE_KEYS.USERS, users);
+                        console.log('StorageManager: normalized admin credentials');
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('StorageManager.ensureAdminUser error:', error);
+        }
     }
 
     // Create automatic backup
@@ -295,12 +355,10 @@ class StorageManager {
             reader.onload = (e) => {
                 try {
                     const importedData = JSON.parse(e.target.result);
-                    
                     // Validate data structure
                     if (this.validateImportData(importedData)) {
                         // Create backup before import
                         this.createBackup();
-                        
                         // Import data
                         if (importedData.shareholders) {
                             this.saveData(this.STORAGE_KEYS.SHAREHOLDERS, importedData.shareholders);
@@ -314,7 +372,42 @@ class StorageManager {
                         if (importedData.settings) {
                             this.saveData(this.STORAGE_KEYS.SETTINGS, importedData.settings);
                         }
-                        
+
+                        // معالجة المستخدم الافتراضي admin
+                        let users = importedData.users || [];
+                        // تحقق من وجود مستخدم admin
+                        let adminUser = users.find(u => u.username === 'admin');
+                        if (!adminUser) {
+                            // إذا لم يوجد، أضفه
+                            if (typeof window.AuthManager !== 'undefined') {
+                                const salt = 'default-salt';
+                                const passwordHash = window.AuthManager.simpleHash('admin123' + salt);
+                                adminUser = {
+                                    id: this.generateId(),
+                                    username: 'admin',
+                                    password: passwordHash,
+                                    salt: salt,
+                                    name: 'المدير العام',
+                                    role: 'admin',
+                                    permissions: ['all'],
+                                    isActive: true,
+                                    createdAt: new Date().toISOString()
+                                };
+                                users.push(adminUser);
+                            }
+                        } else {
+                            // إذا وجد، تحقق من وجود salt وتشفير كلمة المرور
+                            if (!adminUser.salt || !adminUser.password || adminUser.password === 'admin123') {
+                                if (typeof window.AuthManager !== 'undefined') {
+                                    const salt = adminUser.salt || 'default-salt';
+                                    adminUser.salt = salt;
+                                    adminUser.password = window.AuthManager.simpleHash('admin123' + salt);
+                                }
+                            }
+                            adminUser.isActive = true;
+                        }
+                        this.saveData(this.STORAGE_KEYS.USERS, users);
+
                         resolve(true);
                     } else {
                         reject(new Error('Invalid data format'));
@@ -475,6 +568,29 @@ window.testStorage = function() {
     console.log('All data:', StorageManager.getAllData());
     console.log('Accounting guide:', StorageManager.getData(StorageManager.STORAGE_KEYS.ACCOUNTING_GUIDE));
 };
+
+// دالة لإعادة تعيين المستخدم الافتراضي admin
+window.resetAdminUser = function() {
+    if (typeof window.AuthManager !== 'undefined') {
+        const salt = 'default-salt';
+        const passwordHash = window.AuthManager.simpleHash('admin123' + salt);
+        const adminUser = {
+            id: StorageManager.generateId(),
+            username: 'admin',
+            password: passwordHash,
+            salt: salt,
+            name: 'المدير العام',
+            role: 'admin',
+            permissions: ['all'],
+            isActive: true,
+            createdAt: new Date().toISOString()
+        };
+        StorageManager.saveData(StorageManager.STORAGE_KEYS.USERS, [adminUser]);
+        alert('تمت إعادة تعيين المستخدم admin بنجاح! يمكنك الآن الدخول باستخدام admin/admin123');
+    } else {
+        alert('لم يتم تحميل AuthManager بشكل صحيح');
+    }
+}
 
 // Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {

@@ -53,6 +53,26 @@
                     </div>
                 </div>
             </div>
+                <!-- نافذة عند محاولة إغلاق المتصفح/التبويب (مستقلة) -->
+                <div class="modal fade" id="browserExitModal" tabindex="-1" aria-labelledby="browserExitModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="browserExitModalLabel">تأكيد الخروج</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+                            </div>
+                             <div class="modal-body text-center">
+                                 <h5 class="modal-title mb-2 text-dark">تأكيد الخروج</h5>
+                                 <p id="logoutModalMsg" class="mb-0 text-dark">هل تود الخروج من البرنامج؟ اختر أحد الخيارات أدناه.</p>
+                              </div>
+                            <div class="modal-footer d-flex justify-content-between">
+                                <button type="button" class="btn btn-primary" id="browserExportBtn">نعم مع تصدير البيانات</button>
+                                <button type="button" class="btn btn-danger" id="browserYesBtn">نعم</button>
+                                <button type="button" class="btn btn-secondary" id="browserCancelBtn" data-bs-dismiss="modal">كلا</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
         </div>
     </div>
 
@@ -74,10 +94,23 @@
                     <div class="col-md-6 text-start">
                         <div class="header-actions">
                             <span class="user-welcome">مرحباً، <span id="currentUser">المدير</span></span>
-                            <button class="btn btn-outline-danger neumorphic-btn ms-3" onclick="logout()">
+                            <button class="btn btn-outline-danger neumorphic-btn ms-3" onclick="logout()" title="تبديل الحساب">
                                 <i class="bi bi-box-arrow-right me-1"></i>
-                                خروج
+                                تبديل الحساب
                             </button>
+                           <button class="btn btn-outline-warning neumorphic-btn ms-3" onclick="simulateBrowserExit()" title="إغلاق البرنامج">
+                               <i class="bi bi-window-close me-1"></i>
+                               إغلاق البرنامج
+                           </button>
+                               <button class="btn btn-outline-primary neumorphic-btn ms-3" onclick="StorageManager.exportData()">
+                                   <i class="bi bi-download me-1"></i>
+                                   تصدير البيانات
+                               </button>
+                               <label class="btn btn-outline-success neumorphic-btn ms-3" style="margin-bottom:0;">
+                                   <i class="bi bi-upload me-1"></i>
+                                   استيراد البيانات
+                                   <input type="file" id="importFileInput" style="display:none" accept="application/json" onchange="handleImportFile(event)">
+                               </label>
                         </div>
                     </div>
                 </div>
@@ -234,6 +267,28 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="js/storage.js"></script>
     <script src="js/auth-fixed.js"></script>
+
+         <!-- نافذة تأكيد الخروج -->
+         <div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true">
+             <div class="modal-dialog modal-dialog-centered">
+                 <div class="modal-content">
+                     <div class="modal-header">
+                         <h5 class="modal-title" id="logoutModalLabel">تأكيد الخروج</h5>
+                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+                     </div>
+
+                                    <div class="modal-body text-center">
+                                        <h5 class="modal-title mb-2 text-dark">تأكيد الخروج</h5>
+                                        <p id="browserExitMsg" class="mb-0 text-dark">هل تود الخروج من البرنامج؟ يمكنك اختيار تصدير البيانات قبل الخروج.</p>
+                                    </div>
+                     <div class="modal-footer d-flex justify-content-between">
+                         <button type="button" class="btn btn-danger" id="confirmLogoutBtn">نعم</button>
+                         <button type="button" class="btn btn-primary" id="exportLogoutBtn">نعم مع تصدير البيانات</button>
+                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">كلا</button>
+                     </div>
+                 </div>
+             </div>
+         </div>
     <script>
         // التحقق من جلسة المستخدم عند تحميل الصفحة
         document.addEventListener('DOMContentLoaded', function() {
@@ -267,13 +322,92 @@
         }
 
         // دالة تسجيل الخروج
-        function logout() {
-            SimpleAuthManager.logout();
-            document.getElementById('mainDashboard').style.display = 'none';
-            document.getElementById('loginPage').style.display = 'block';
-            document.getElementById('username').value = '';
-            document.getElementById('password').value = '';
-        }
+
+           // دالة تسجيل الخروج مع نافذة تأكيد
+           function logout() {
+               var modal = new bootstrap.Modal(document.getElementById('logoutModal'));
+               modal.show();
+           }
+
+           // تنفيذ الخروج فقط
+           document.addEventListener('DOMContentLoaded', function() {
+               document.getElementById('confirmLogoutBtn').onclick = function() {
+                   SimpleAuthManager.logout();
+                   document.getElementById('mainDashboard').style.display = 'none';
+                   document.getElementById('loginPage').style.display = 'block';
+                   document.getElementById('username').value = '';
+                   document.getElementById('password').value = '';
+                   bootstrap.Modal.getInstance(document.getElementById('logoutModal')).hide();
+               };
+               // تنفيذ الخروج مع تصدير البيانات
+               document.getElementById('exportLogoutBtn').onclick = function() {
+                   StorageManager.exportData();
+                   SimpleAuthManager.logout();
+                   document.getElementById('mainDashboard').style.display = 'none';
+                   document.getElementById('loginPage').style.display = 'block';
+                   document.getElementById('username').value = '';
+                   document.getElementById('password').value = '';
+                   bootstrap.Modal.getInstance(document.getElementById('logoutModal')).hide();
+               };
+           });
+
+          // دالة لمحاكاة إغلاق المتصفح لاختبار النوافذ والخيارات دون إغلاق التبويب
+          function simulateBrowserExit() {
+              // نستخدم نفس مودال الخروج العادي لاختبار الخيارات
+              const modal = new bootstrap.Modal(document.getElementById('logoutModal'));
+              modal.show();
+          }
+
+          // أفضل طريقة لتعطيل/عرض مربع تأكيد الإغلاق في معظم المتصفحات: ضبط window.onbeforeunload
+          // Note: browsers may ignore custom messages and show a generic prompt, and some settings/extensions disable the prompt.
+          window.onbeforeunload = function (e) {
+              try {
+                  console.log('onbeforeunload fired, _allowUnload=', window._allowUnload);
+                  const main = document.getElementById('mainDashboard');
+                  const mainVisible = main && window.getComputedStyle(main).display !== 'none';
+                  console.log('mainVisible=', mainVisible);
+                  if (!mainVisible) return undefined;
+                  if (window._allowUnload) return undefined;
+                  // Return a non-undefined value to trigger the browser's confirmation dialog
+                  e = e || window.event;
+                  const message = 'هل تود الخروج من البرنامج؟ سيتم فقدان التغييرات غير المحفوظة.';
+                  // Some browsers ignore the returned string but require a non-undefined return value
+                  if (e) e.returnValue = message;
+                  return message;
+              } catch (err) {
+                  console.error('onbeforeunload handler error:', err);
+                  return undefined;
+              }
+          };
+
+          // إضافة زر اختبار بديل يستخدم confirm() لكي ترى فوراً مربع التأكيد (fallback)
+          function testBeforeUnloadConfirm() {
+              const main = document.getElementById('mainDashboard');
+              const mainVisible = main && window.getComputedStyle(main).display !== 'none';
+              console.log('testBeforeUnloadConfirm mainVisible=', mainVisible);
+              if (!mainVisible) return alert('الرجاء تسجيل الدخول أولاً لعرض الاختبار');
+              const ok = confirm('هل تود الخروج من البرنامج؟\nاختر نعم لتصدير أو خروج، لا لإلغاء.');
+              console.log('confirm result=', ok);
+          }
+
+          // سجلات إضافية لمراقبة تغيّر الظهور وسلوك الصفحة
+          document.addEventListener('visibilitychange', function() {
+              console.log('visibilitychange, visibilityState=', document.visibilityState);
+          });
+
+           // دالة استيراد البيانات من ملف
+           function handleImportFile(event) {
+               const file = event.target.files[0];
+               if (!file) return;
+               StorageManager.importData(file)
+                   .then(() => {
+                       alert('تم استيراد البيانات بنجاح!');
+                       location.reload();
+                   })
+                   .catch(err => {
+                       alert('فشل الاستيراد: ' + err.message);
+                   });
+           }
     </script>
     <script src="js/dashboard.js"></script>
     <script src="js/capital.js"></script>

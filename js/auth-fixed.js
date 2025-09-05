@@ -63,16 +63,19 @@ class AuthManager {
 
             // Get users from storage
             let users = StorageManager.getData(StorageManager.STORAGE_KEYS.USERS) || [];
+            if (!Array.isArray(users)) users = [];
             console.log('AuthManager: عدد المستخدمين المحفوظين:', users.length);
 
-            // Create default admin user if no users exist
-            if (users.length === 0) {
-                console.log('AuthManager: إنشاء مستخدم افتراضي');
+            // Ensure admin user exists even if users array exists but admin missing
+            let adminUser = users.find(u => u.username === 'admin');
+            if (!adminUser) {
+                console.log('AuthManager: إضافة المستخدم الافتراضي admin لأنه غير موجود');
+                const salt = 'default-salt';
                 const defaultAdmin = {
                     id: StorageManager.generateId(),
                     username: 'admin',
-                    password: this.simpleHash('admin123' + 'default-salt'),
-                    salt: 'default-salt',
+                    password: this.simpleHash('admin123' + salt),
+                    salt: salt,
                     name: 'المدير العام',
                     role: 'admin',
                     permissions: ['all'],
@@ -81,7 +84,23 @@ class AuthManager {
                 };
                 users.push(defaultAdmin);
                 StorageManager.saveData(StorageManager.STORAGE_KEYS.USERS, users);
-                console.log('AuthManager: تم إنشاء وحفظ المستخدم الافتراضي');
+                adminUser = defaultAdmin;
+                console.log('AuthManager: تم إنشاء وحفظ المستخدم الافتراضي admin');
+            } else {
+                // If admin exists but has no salt or has plain password, normalize it
+                if (!adminUser.salt || !adminUser.password || adminUser.password === 'admin123') {
+                    console.log('AuthManager: تصحيح بيانات admin (تهيئة salt وhash)');
+                    const salt = adminUser.salt || 'default-salt';
+                    adminUser.salt = salt;
+                    adminUser.password = this.simpleHash('admin123' + salt);
+                    adminUser.isActive = true;
+                    // save back
+                    const idx = users.findIndex(u => u.username === 'admin');
+                    if (idx !== -1) {
+                        users[idx] = adminUser;
+                        StorageManager.saveData(StorageManager.STORAGE_KEYS.USERS, users);
+                    }
+                }
             }
 
             // Find user
