@@ -1129,11 +1129,27 @@ class CapitalManager {
         const shareholders = StorageManager.getData(StorageManager.STORAGE_KEYS.SHAREHOLDERS) || [];
         const shareholder = shareholders.find(s => s.id === this.lastSavedEntry.shareholderId);
 
-        const receiptHTML = this.generateReceiptHTML(this.lastSavedEntry, shareholder);
+        const receiptBody = this.generateReceiptHTML(this.lastSavedEntry, shareholder);
+        const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('سند رأس مال') : '';
+
+        const fullHTML = `
+            <!DOCTYPE html>
+            <html lang="ar" dir="rtl">
+            <head>
+                <meta charset="UTF-8">
+                <title>سند رأس مال</title>
+                <link rel="stylesheet" href="css/style.css">
+            </head>
+            <body>
+                ${header}
+                <div class="receipt-body">${receiptBody}</div>
+            </body>
+            </html>
+        `;
 
         // Create print window
         const printWindow = window.open('', '_blank', 'width=800,height=600');
-        printWindow.document.write(receiptHTML);
+        printWindow.document.write(fullHTML);
         printWindow.document.close();
 
         // Wait for content to load then print
@@ -1155,11 +1171,27 @@ class CapitalManager {
         const shareholders = StorageManager.getData(StorageManager.STORAGE_KEYS.SHAREHOLDERS) || [];
         const shareholder = shareholders.find(s => s.id === entry.shareholderId);
 
-        const receiptHTML = this.generateReceiptHTML(entry, shareholder);
+        const receiptBody = this.generateReceiptHTML(entry, shareholder);
+        const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('سند رأس مال') : '';
+
+        const fullHTML = `
+            <!DOCTYPE html>
+            <html lang="ar" dir="rtl">
+            <head>
+                <meta charset="UTF-8">
+                <title>سند رأس مال</title>
+                <link rel="stylesheet" href="css/style.css">
+            </head>
+            <body>
+                ${header}
+                <div class="receipt-body">${receiptBody}</div>
+            </body>
+            </html>
+        `;
 
         // Create print window
         const printWindow = window.open('', '_blank', 'width=800,height=600');
-        printWindow.document.write(receiptHTML);
+        printWindow.document.write(fullHTML);
         printWindow.document.close();
 
         // Wait for content to load then print

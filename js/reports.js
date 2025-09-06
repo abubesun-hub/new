@@ -471,7 +471,30 @@ class ReportsManager {
 
     // Print report
     printReport() {
-        window.print();
+        if (!this.currentReport) return;
+
+        const content = this.generateReportContent(this.currentReport);
+        const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML(this.currentReport.title || 'تقرير') : '';
+
+        const printHTML = `
+            <!DOCTYPE html>
+            <html lang="ar" dir="rtl">
+            <head>
+                <meta charset="utf-8">
+                <title>${this.currentReport.title || 'تقرير'}</title>
+                <link rel="stylesheet" href="css/style.css">
+            </head>
+            <body>
+                ${header}
+                <div class="report-content">${content}</div>
+            </body>
+            </html>
+        `;
+
+        const win = window.open('', '_blank', 'width=1100,height=800');
+        win.document.write(printHTML);
+        win.document.close();
+        win.onload = () => win.print();
     }
 
     // Utility functions

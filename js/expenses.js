@@ -1210,11 +1210,28 @@ class ExpensesManager {
             return;
         }
 
-        const receiptHTML = this.generateExpenseReceiptHTML(this.lastSavedEntry);
+        const receiptBody = this.generateExpenseReceiptHTML(this.lastSavedEntry);
+        const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('سند صرف') : '';
+
+        const fullHTML = `
+            <!DOCTYPE html>
+            <html lang="ar" dir="rtl">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>إيصال مصروف - ${this.lastSavedEntry.registrationNumber}</title>
+                <link rel="stylesheet" href="css/style.css">
+            </head>
+            <body>
+                ${header}
+                <div class="receipt-body">${receiptBody}</div>
+            </body>
+            </html>
+        `;
 
         // Create print window
         const printWindow = window.open('', '_blank', 'width=800,height=600');
-        printWindow.document.write(receiptHTML);
+        printWindow.document.write(fullHTML);
         printWindow.document.close();
 
         // Wait for content to load then print
@@ -2512,6 +2529,10 @@ class ExpensesManager {
                 .map(node => node.outerHTML)
                 .join('\n');
 
+            const headerHTML = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('تقرير فئات المصروفات') : `
+                <div style="text-align:center;font-weight:700;">تقرير فئات المصروفات</div>
+            `;
+
             const printHTML = `<!doctype html>
             <html lang="ar" dir="rtl">
             <head>
@@ -2520,38 +2541,14 @@ class ExpensesManager {
                 <title>تقرير فئات المصروفات - طباعة</title>
                 ${styles}
                 <style>
-                    /* Ensure a clean, minimal header for prints */
                     body { background: #fff; color: #000; direction: rtl; font-family: 'Cairo', sans-serif; }
-                    .print-header { text-align: center; margin-bottom: 1rem; }
-                    .print-title { font-size: 20px; font-weight: 700; color: #333; }
-                    .print-sub { font-size: 13px; color: #666; }
-                    /* Branding line: force visual LTR so left block appears on the left and right block on the right */
-                    .print-brand { display:flex; align-items:center; justify-content:space-between; gap:12px; direction:ltr; margin-bottom:6px; }
-                    .pb-left { display:flex; align-items:center; gap:10px; direction:ltr; }
-                    .pb-left .program-name { font-weight:700; font-size:18px; color:#2c3e50; }
-                    .pb-right { direction:rtl; font-weight:700; font-size:16px; color:#2c3e50; }
                     /* Remove any remaining interactive controls */
                     .neumorphic-btn, .header-actions, .input-group, .btn { display: none !important; }
                     .neumorphic-card { box-shadow: none !important; }
                 </style>
             </head>
             <body>
-                <div class="print-header">
-                    <div class="print-brand">
-                        <div class="pb-left">
-                            <!-- Inline SVG logo (no conflicting classes) -->
-                            <svg width="56" height="56" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
-                                <rect x="6" y="18" width="52" height="34" rx="4" fill="#2c5aa0"></rect>
-                                <path d="M10 22h44v6H10z" fill="#fff" opacity="0.15"></path>
-                                <path d="M20 10h24v8H20z" fill="#ffb02e"></path>
-                            </svg>
-                            <div class="program-name">نظام المحاسبة</div>
-                        </div>
-                        <div class="pb-right">شركة المقاولات المتقدمة</div>
-                    </div>
-                    <div class="print-title">تقرير فئات المصروفات</div>
-                    <div class="print-sub">تاريخ الطباعة: ${new Date().toLocaleDateString('ar-IQ')} - ${new Date().toLocaleTimeString('ar-IQ')}</div>
-                </div>
+                ${headerHTML}
                 <div class="print-body">${contentEl.innerHTML}</div>
             </body>
             </html>`;
@@ -2575,7 +2572,30 @@ class ExpensesManager {
     }
 
     printCategoryDetails(categoryName) {
-        window.print();
+        const el = document.getElementById('categoryDetailsContent');
+        if (!el) return this.showNotification('لا يوجد محتوى للطباعة', 'error');
+
+        const headerHTML = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML(`تفاصيل الفئة: ${categoryName}`) : `<h3>تفاصيل الفئة: ${categoryName}</h3>`;
+        const printHTML = `
+            <!doctype html>
+            <html lang="ar" dir="rtl">
+            <head>
+                <meta charset="utf-8" />
+                <meta name="viewport" content="width=device-width,initial-scale=1" />
+                <title>تفاصيل الفئة - ${categoryName}</title>
+                <link rel="stylesheet" href="css/style.css">
+            </head>
+            <body>
+                ${headerHTML}
+                <div class="print-body">${el.innerHTML}</div>
+            </body>
+            </html>
+        `;
+
+        const win = window.open('', '_blank', 'width=900,height=700');
+        win.document.write(printHTML);
+        win.document.close();
+        win.onload = () => win.print();
     }
 
     // Fill test data function with multiple currency scenarios

@@ -761,8 +761,9 @@ class AccountingApp {
         const totalIQD = document.getElementById('totalIQDSummary')?.textContent || '0 د.ع';
         const totalEntries = document.getElementById('totalEntriesSummary')?.textContent || '0';
 
-        const printWindow = window.open('', '_blank', 'width=1200,height=800');
-        const printHTML = `
+    const headerHTML = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('تقرير رأس المال الشامل') : '';
+    const printWindow = window.open('', '_blank', 'width=1200,height=800');
+    const printHTML = `
             <!DOCTYPE html>
             <html lang="ar" dir="rtl">
             <head>
@@ -872,11 +873,7 @@ class AccountingApp {
                 </style>
             </head>
             <body>
-                <div class="header">
-                    <div class="company-name">شركة المقاولات المتقدمة</div>
-                    <div class="report-title">تقرير رأس المال الشامل</div>
-                    <div class="print-date">تاريخ الطباعة: ${new Date().toLocaleDateString('ar-IQ')} - ${new Date().toLocaleTimeString('ar-IQ')}</div>
-                </div>
+                ${headerHTML}
 
                 <div class="summary-section">
                     <div class="summary-title">ملخص التقرير</div>
