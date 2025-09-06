@@ -1013,11 +1013,24 @@ class ExpensesManager {
         if (data.expenses) {
             const categories = new Set();
             data.expenses.forEach(expense => {
-                const amount = parseFloat(expense.amount) || 0;
-                if (expense.currency === 'USD') {
-                    stats.totalUSD += amount;
-                } else if (expense.currency === 'IQD') {
-                    stats.totalIQD += amount;
+                // دعم المصروفات المختلطة
+                let addedUSD = false, addedIQD = false;
+                if (expense.amountUSD !== undefined) {
+                    stats.totalUSD += parseFloat(expense.amountUSD) || 0;
+                    addedUSD = true;
+                }
+                if (expense.amountIQD !== undefined) {
+                    stats.totalIQD += parseFloat(expense.amountIQD) || 0;
+                    addedIQD = true;
+                }
+                // إذا لم يكن مختلط، استخدم amount/currency
+                if (!addedUSD && !addedIQD) {
+                    const amount = parseFloat(expense.amount) || 0;
+                    if (expense.currency === 'USD') {
+                        stats.totalUSD += amount;
+                    } else if (expense.currency === 'IQD') {
+                        stats.totalIQD += amount;
+                    }
                 }
                 if (expense.category) {
                     categories.add(expense.category);

@@ -56,11 +56,23 @@ class DashboardManager {
         // Calculate expenses totals
         if (data.expenses) {
             data.expenses.forEach(entry => {
-                const amount = parseFloat(entry.amount) || 0;
-                if (entry.currency === 'USD') {
-                    stats.expenses.USD += amount;
-                } else if (entry.currency === 'IQD') {
-                    stats.expenses.IQD += amount;
+                let addedUSD = false, addedIQD = false;
+                if (entry.amountUSD !== undefined) {
+                    stats.expenses.USD += parseFloat(entry.amountUSD) || 0;
+                    addedUSD = true;
+                }
+                if (entry.amountIQD !== undefined) {
+                    stats.expenses.IQD += parseFloat(entry.amountIQD) || 0;
+                    addedIQD = true;
+                }
+                // إذا لم يكن مختلط، استخدم amount/currency
+                if (!addedUSD && !addedIQD) {
+                    const amount = parseFloat(entry.amount) || 0;
+                    if (entry.currency === 'USD') {
+                        stats.expenses.USD += amount;
+                    } else if (entry.currency === 'IQD') {
+                        stats.expenses.IQD += amount;
+                    }
                 }
             });
             stats.transactions += data.expenses.length;
