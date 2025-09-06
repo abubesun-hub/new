@@ -2500,7 +2500,74 @@ class ExpensesManager {
     }
 
     printCategoriesReport() {
-        window.print();
+        try {
+            // Build minimal print page with only the categories display area
+            const contentEl = document.getElementById('categoriesDisplayArea');
+            if (!contentEl) {
+                this.showNotification('لا يوجد محتوى للطباعة', 'error');
+                return;
+            }
+
+            const styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+                .map(node => node.outerHTML)
+                .join('\n');
+
+            const printHTML = `<!doctype html>
+            <html lang="ar" dir="rtl">
+            <head>
+                <meta charset="utf-8" />
+                <meta name="viewport" content="width=device-width,initial-scale=1" />
+                <title>تقرير فئات المصروفات - طباعة</title>
+                ${styles}
+                <style>
+                    /* Ensure a clean, minimal header for prints */
+                    body { background: #fff; color: #000; direction: rtl; font-family: 'Cairo', sans-serif; }
+                    .print-header { text-align: center; margin-bottom: 1rem; }
+                    .print-title { font-size: 20px; font-weight: 700; color: #333; }
+                    .print-sub { font-size: 13px; color: #666; }
+                    /* Branding line: force visual LTR so left block appears on the left and right block on the right */
+                    .print-brand { display:flex; align-items:center; justify-content:space-between; gap:12px; direction:ltr; margin-bottom:6px; }
+                    .pb-left { display:flex; align-items:center; gap:10px; direction:ltr; }
+                    .pb-left .program-name { font-weight:700; font-size:18px; color:#2c3e50; }
+                    .pb-right { direction:rtl; font-weight:700; font-size:16px; color:#2c3e50; }
+                    /* Remove any remaining interactive controls */
+                    .neumorphic-btn, .header-actions, .input-group, .btn { display: none !important; }
+                    .neumorphic-card { box-shadow: none !important; }
+                </style>
+            </head>
+            <body>
+                <div class="print-header">
+                    <div class="print-brand">
+                        <div class="pb-left">
+                            <!-- Inline SVG logo (no conflicting classes) -->
+                            <svg width="56" height="56" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
+                                <rect x="6" y="18" width="52" height="34" rx="4" fill="#2c5aa0"></rect>
+                                <path d="M10 22h44v6H10z" fill="#fff" opacity="0.15"></path>
+                                <path d="M20 10h24v8H20z" fill="#ffb02e"></path>
+                            </svg>
+                            <div class="program-name">نظام المحاسبة</div>
+                        </div>
+                        <div class="pb-right">شركة المقاولات المتقدمة</div>
+                    </div>
+                    <div class="print-title">تقرير فئات المصروفات</div>
+                    <div class="print-sub">تاريخ الطباعة: ${new Date().toLocaleDateString('ar-IQ')} - ${new Date().toLocaleTimeString('ar-IQ')}</div>
+                </div>
+                <div class="print-body">${contentEl.innerHTML}</div>
+            </body>
+            </html>`;
+
+            const win = window.open('', '_blank', 'width=1200,height=800');
+            win.document.open();
+            win.document.write(printHTML);
+            win.document.close();
+            win.onload = () => {
+                win.focus();
+                win.print();
+            };
+        } catch (err) {
+            console.error('Print error:', err);
+            window.print();
+        }
     }
 
     exportCategoryDetails(categoryName) {

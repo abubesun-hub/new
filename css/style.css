@@ -1,3 +1,51 @@
+/* إخفاء عناصر غير مطلوبة عند الطباعة
+   وتبسيط رأس الصفحة: إزالة الشعار واسم البرنامج واسم الشركة من طباعة التقارير */
+@media print {
+    /* Controls, navigation and interactive elements */
+    .sidebar,
+    .main-nav,
+    .search-bar,
+    .sort-bar,
+    .neumorphic-btn,
+    .actions,
+    .print-hide,
+    .nav,
+    .menu,
+    .report-controls,
+    /* Expense categories controls to hide in print */
+    #categoriesSearchInput,
+    #categoriesSortBy,
+    #categoriesViewMode,
+    .categories-container .header-actions,
+    .categories-container .input-group-text,
+    /* Header/logo/title elements to hide in print for a clean header */
+    .logo-container,
+    .logo-icon,
+    .login-title,
+    .login-subtitle,
+    .dashboard-title,
+    .dashboard-subtitle,
+    .dashboard-header .header-info,
+    .logo-container .login-title {
+        display: none !important;
+    }
+
+    /* Keep the header actions (user, export) visible if needed, but hide heavy visuals */
+    .header-actions { display: inline-flex !important; }
+
+    /* Colors and background for print */
+    body {
+        background: #fff !important;
+        color: #000 !important;
+    }
+
+    /* Slight layout adjustment for printed content */
+    .neumorphic-card {
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        padding: 0.5rem !important;
+    }
+}
 /* Arabic RTL Support and Neumorphic Design */
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700&display=swap');
 
@@ -147,6 +195,29 @@ body {
     margin-bottom: 1rem;
     display: block;
 }
+
+/* Branding layout for header/login */
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+.brand-logo .logo-icon {
+    display: block;
+}
+.brand-text {
+    text-align: right;
+}
+.company-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+.program-name {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+}
+
 
 .login-title {
     font-size: 2rem;
@@ -698,6 +769,83 @@ body {
 
     .table {
         font-size: 12px;
+    }
+
+    /* Categories report: make cards render in horizontal columns for print */
+    .categories-container {
+        background: #fff;
+        color: #000;
+    }
+
+    /* Make the summary statistics a single horizontal row */
+    .categories-container .row.mb-4 {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        gap: 8px;
+        margin-bottom: 6px !important;
+    }
+
+    .categories-container .row.mb-4 > div {
+        flex: 1 1 24% !important;
+        min-width: 0;
+    }
+
+    /* Cards area: use multi-column/flex layout so items appear side-by-side */
+    #categoriesCardsContainer {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+    }
+
+    .category-card {
+        /* three cards per row on A4 landscape, two per row on portrait if space is tight */
+        flex: 1 1 calc(33.333% - 8px) !important;
+        max-width: calc(33.333% - 8px) !important;
+        box-shadow: none !important;
+        border: 1px solid #ddd !important;
+        background: #fff !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+
+    /* Make card headers compact and remove heavy visuals */
+    .category-card .card-header,
+    .category-card .card-footer,
+    .category-card .card-body {
+        padding: 6px !important;
+    }
+
+    .category-card .card-header h6 {
+        font-size: 12px !important;
+        margin: 0 !important;
+    }
+
+    .category-card .card-body h5,
+    .category-card .card-body strong {
+        font-size: 12px !important;
+    }
+
+    /* Reduce general spacing for print to fit more horizontally */
+    .neumorphic-card,
+    .card,
+    .card-body {
+        padding: 6px !important;
+        margin: 0 !important;
+    }
+
+/* Ensure branding looks good on screen (not print) */
+@media screen {
+    .brand-logo svg.logo-icon { border-radius: 6px; }
+    .brand-text .company-name { font-size: 1.05rem; }
+}
+
+    /* Hide interactive controls already covered */
+    #categoriesSearchInput,
+    #categoriesSortBy,
+    #categoriesViewMode,
+    .categories-container .header-actions,
+    .categories-container .input-group-text {
+        display: none !important;
     }
 }
 

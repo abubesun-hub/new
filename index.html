@@ -15,9 +15,23 @@
         <div class="login-form-container">
             <div class="login-form neumorphic-card">
                 <div class="logo-container">
-                    <i class="bi bi-building-check logo-icon"></i>
-                    <h2 class="login-title">نظام المحاسبة</h2>
-                    <p class="login-subtitle">للشركات المقاولة</p>
+                    <div class="brand">
+                        <div class="brand-logo" aria-hidden="true">
+                            <!-- Inline SVG simple logo placeholder -->
+                            <svg class="logo-icon" width="56" height="56" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img">
+                                <rect x="6" y="18" width="52" height="34" rx="4" fill="#2c5aa0"></rect>
+                                <path d="M10 22h44v6H10z" fill="#fff" opacity="0.15"></path>
+                                <path d="M20 10h24v8H20z" fill="#ffb02e"></path>
+                                <g fill="#fff" font-size="10" font-family="sans-serif" transform="translate(8,28)">
+                                </g>
+                            </svg>
+                        </div>
+                        <div class="brand-text">
+                            <div class="company-name">شركة المقاولات المتقدمة</div>
+                            <h2 class="login-title">نظام المحاسبة</h2>
+                            <p class="login-subtitle">للشركات المقاولة</p>
+                        </div>
+                    </div>
                 </div>
                 
                 <form id="loginForm" class="mt-4" onsubmit="handleLogin(event)">
@@ -84,11 +98,21 @@
                 <div class="row align-items-center">
                     <div class="col-md-6">
                         <div class="header-info">
-                            <h1 class="dashboard-title">
-                                <i class="bi bi-building-check me-2"></i>
-                                نظام المحاسبة
-                            </h1>
-                            <p class="dashboard-subtitle">إدارة مالية متكاملة للشركات المقاولة</p>
+                            <div class="brand" style="align-items:center;">
+                                <div class="brand-logo" aria-hidden="true">
+                                    <!-- Inline SVG logo (same as login) -->
+                                    <svg class="logo-icon" width="44" height="44" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img">
+                                        <rect x="6" y="18" width="52" height="34" rx="4" fill="#2c5aa0"></rect>
+                                        <path d="M10 22h44v6H10z" fill="#fff" opacity="0.15"></path>
+                                        <path d="M20 10h24v8H20z" fill="#ffb02e"></path>
+                                    </svg>
+                                </div>
+                                <div class="brand-text">
+                                    <h1 class="dashboard-title">نظام المحاسبة</h1>
+                                    <div class="program-name">نظام المحاسبة للشركات المقاولة</div>
+                                    <div class="company-name small">شركة المقاولات المتقدمة</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="col-md-6 text-start">
