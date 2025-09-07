@@ -1130,7 +1130,8 @@ class CapitalManager {
         const shareholder = shareholders.find(s => s.id === this.lastSavedEntry.shareholderId);
 
         const receiptBody = this.generateReceiptHTML(this.lastSavedEntry, shareholder);
-        const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('سند رأس مال') : '';
+    // Insert the branded header created in print-utils with the receipt title
+    const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('ايصال ادخال رأس المال') : '';
 
         const fullHTML = `
             <!DOCTYPE html>
@@ -1173,7 +1174,8 @@ class CapitalManager {
         const shareholder = shareholders.find(s => s.id === entry.shareholderId);
 
         const receiptBody = this.generateReceiptHTML(entry, shareholder);
-        const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('سند رأس مال') : '';
+    // Insert the branded header (logo/program/company) with the receipt title
+    const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('ايصال ادخال رأس المال') : '';
 
         const fullHTML = `
             <!DOCTYPE html>
@@ -1233,36 +1235,31 @@ class CapitalManager {
                 }
                 .header {
                     text-align: center;
-                    border-bottom: 3px double #333;
-                    padding-bottom: 20px;
-                    margin-bottom: 30px;
+                    border-bottom: 2px solid #333;
+                    padding-bottom: 10px;
+                    margin-bottom: 12px;
                 }
                 .company-name {
-                    font-size: 28px;
-                    font-weight: bold;
-                    color: #2c3e50;
-                    margin-bottom: 10px;
+                    display:none; /* removed per user request */
                 }
                 .receipt-title {
-                    font-size: 24px;
-                    color: #e74c3c;
-                    font-weight: bold;
-                    margin-bottom: 10px;
+                    display:none; /* removed per user request */
                 }
                 .receipt-number {
-                    font-size: 18px;
-                    color: #7f8c8d;
+                    font-size:14px;
+                    color:#7f8c8d;
+                    margin-top:4px;
                 }
                 .receipt-body {
-                    margin: 30px 0;
+                    margin: 12px 0;
                 }
                 .info-row {
                     display: flex;
                     justify-content: space-between;
-                    margin-bottom: 15px;
-                    padding: 10px;
+                    margin-bottom: 8px;
+                    padding: 8px;
                     background: #f8f9fa;
-                    border-radius: 5px;
+                    border-radius: 4px;
                 }
                 .info-label {
                     font-weight: bold;
@@ -1276,51 +1273,52 @@ class CapitalManager {
                 }
                 .amount-section {
                     background: #e8f5e8;
-                    border: 2px solid #27ae60;
-                    border-radius: 10px;
-                    padding: 20px;
-                    margin: 30px 0;
+                    border: 1px solid #27ae60;
+                    border-radius: 8px;
+                    padding: 12px;
+                    margin: 12px 0;
                     text-align: center;
                 }
                 .amount-label {
-                    font-size: 18px;
+                    font-size: 14px;
                     color: #27ae60;
                     font-weight: bold;
-                    margin-bottom: 10px;
+                    margin-bottom: 6px;
                 }
                 .amount-value {
-                    font-size: 32px;
+                    font-size: 22px;
                     color: #27ae60;
                     font-weight: bold;
                 }
                 .amount-words {
-                    font-size: 16px;
+                    font-size: 13px;
                     color: #2c3e50;
-                    margin-top: 10px;
+                    margin-top: 6px;
                     font-style: italic;
                 }
                 .footer {
-                    border-top: 2px solid #333;
-                    padding-top: 20px;
-                    margin-top: 40px;
+                    border-top: 1px solid #333;
+                    padding-top: 10px;
+                    margin-top: 16px;
                 }
                 .signatures {
                     display: flex;
                     justify-content: space-between;
-                    margin-top: 50px;
+                    margin-top: 20px;
                 }
                 .signature-box {
                     text-align: center;
-                    width: 200px;
+                    width: 140px;
                 }
                 .signature-line {
-                    border-bottom: 2px solid #333;
-                    height: 50px;
-                    margin-bottom: 10px;
+                    border-bottom: 1px solid #333;
+                    height: 36px;
+                    margin-bottom: 6px;
                 }
                 .signature-label {
                     font-weight: bold;
                     color: #2c3e50;
+                    font-size: 12px;
                 }
                 .print-info {
                     text-align: center;
@@ -1331,17 +1329,10 @@ class CapitalManager {
                     padding-top: 15px;
                 }
                 @media print {
-                    body {
-                        margin: 0;
-                        padding: 10px;
-                    }
-                    .receipt-container {
-                        border: 2px solid #000;
-                        box-shadow: none;
-                    }
-                    .print-info {
-                        display: none;
-                    }
+                    body { margin:0; padding:6px; }
+                    .receipt-container { border: 1px solid #000; box-shadow: none; padding:12px; }
+                    .print-info { display: none; }
+                    .receipt-container { max-height: 100vh; }
                 }
             </style>
         </head>

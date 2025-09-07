@@ -228,6 +228,32 @@
       "hasIQDOnly": false,
       "hasUSDOnly": false,
       "createdAt": "2025-09-06T08:52:32.123Z"
+    },
+    {
+      "id": "mf813vt800942lg00tk7u",
+      "registrationNumber": "202509064257",
+      "date": "2025-09-06",
+      "amountIQD": 150000,
+      "amountUSD": 0,
+      "exchangeRate": 1500,
+      "description": "اجور عمال ",
+      "accountingGuide": "guide007",
+      "accountingGuideCode": "5202",
+      "accountingGuideName": "أجور العمال العاديين",
+      "beneficiary": "6",
+      "receiptNumber": "6",
+      "receiptDate": "",
+      "vendor": "6",
+      "paymentMethod": "cash",
+      "category": "العمالة",
+      "project": "",
+      "notes": "",
+      "currency": "IQD",
+      "amount": 150000,
+      "hasBothCurrencies": false,
+      "hasIQDOnly": true,
+      "hasUSDOnly": false,
+      "createdAt": "2025-09-06T08:55:35.372Z"
     }
   ],
   "users": [
@@ -250,7 +276,27 @@
     "currency": "USD",
     "language": "ar",
     "autoBackup": true,
-    "backupInterval": 3600000
+    "backupInterval": 3600000,
+    "programName": "نظام المحاسبة",
+    "companyName": "المبرمج احمد حسين علي",
+    "appFont": "Tajawal",
+    "printLogoDataUrl": null,
+    "watermark": {
+      "enabled": false,
+      "text": "",
+      "opacity": 8,
+      "fontSize": 96,
+      "rotate": -30,
+      "mode": "behind"
+    },
+    "footer": {
+      "address": "العراق - الانبار - الرمادي - شارع المستودع ",
+      "footerLogoDataUrl": "data:image/jpeg;base64,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",
+      "email": "Abubesun@gmail.com",
+      "phone1": "07905880479",
+      "phone2": "07817823680"
+    },
+    "companySubtitle": "للمقاولات العامة والتجارة"
   },
   "accountingGuide": [
     {
@@ -455,6 +501,6 @@
       "createdAt": "2025-09-06T08:19:16.132Z"
     }
   ],
-  "exportDate": "2025-09-06T08:52:48.019Z",
+  "exportDate": "2025-09-07T11:37:41.510Z",
   "version": "1.0"
 }

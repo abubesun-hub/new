@@ -3,6 +3,7 @@ function buildBrandedHeaderHTML(title) {
     const appSettings = (typeof StorageManager !== 'undefined') ? StorageManager.getData(StorageManager.STORAGE_KEYS.SETTINGS) || {} : {};
     const programName = appSettings.programName || 'نظام المحاسبة';
     const companyName = appSettings.companyName || 'شركة المقاولات المتقدمة';
+  const companySubtitle = appSettings.companySubtitle || '';
     const logoDataUrl = appSettings.printLogoDataUrl || null;
 
     const fontFamily = appSettings.appFont || 'Cairo';
@@ -14,7 +15,10 @@ function buildBrandedHeaderHTML(title) {
   .pb-left { display:flex; align-items:center; gap:10px; direction:ltr; }
         .pb-left img { height:48px; width:auto; }
   .program-name { font-weight:700; font-size:18px; color:#2c3e50; text-align:left; }
-  .pb-right { font-weight:700; font-size:16px; color:#2c3e50; text-align:right; }
+  /* Company block on the right: nicer, two-line style */
+  .pb-right { display:flex; flex-direction:column; align-items:flex-end; text-align:right; }
+  .pb-right .company-name-main { font-weight:800; font-size:18px; color:#1f2937; letter-spacing:0.2px; }
+  .pb-right .company-name-sub { font-size:12px; color:#6b7280; font-weight:600; margin-top:2px; }
         .print-title { font-size:16px; font-weight:700; margin-top:6px; text-align:center; }
         .print-sub { font-size:12px; color:#666; text-align:center; margin-bottom:8px; }
   /* Watermark styles (an overlay centered across the page) */
@@ -42,7 +46,7 @@ function buildBrandedHeaderHTML(title) {
             ${logoHtml}
             <div class="program-name">${programName}</div>
           </div>
-          <div class="pb-right">${companyName}</div>
+          <div class="pb-right"><div class="company-name-main">${companyName}</div><div class="company-name-sub">${companySubtitle}</div></div>
         </div>
         <div class="print-title">${title}</div>
         <div class="print-sub">تاريخ الطباعة: ${new Date().toLocaleDateString('ar-IQ')} ${new Date().toLocaleTimeString('ar-IQ')}</div>
@@ -92,8 +96,20 @@ function buildPrintFooterHTML() {
       .print-footer .col-right { text-align:right; flex:1; }
       .print-footer .col-center { text-align:center; flex:1; }
       .print-footer .col-left { text-align:left; flex:1; }
+  /* Address styling: icon + two-tone text, right-aligned for RTL layouts */
+  .print-footer .footer-address { display:inline-flex; align-items:center; gap:8px; justify-content:flex-end; direction:rtl; }
+  .print-footer .footer-address svg { width:18px; height:18px; flex-shrink:0; color:#2c5aa0; }
+  .print-footer .footer-address .addr-text { display:block; font-weight:700; color:#1f2937; font-size:13px; }
+  .print-footer .footer-address .addr-sub { display:block; font-size:11px; color:#6b7280; font-weight:500; }
   .print-footer .footer-logo { height:36px; display:inline-block; }
-  .print-footer .phones { text-align:left; margin-top:4px; display:block; }
+  /* Email and phone styling */
+  /* Force left-to-right layout for contact info so icon and text align left visually */
+  .print-footer .footer-contact { display:flex; flex-direction:column; gap:6px; align-items:flex-start; direction:ltr; text-align:left; }
+  .print-footer .footer-email { display:inline-flex; align-items:center; gap:8px; color:#2c3e50; font-weight:600; text-decoration:none; justify-content:flex-start; }
+  .print-footer .footer-email svg { width:16px; height:16px; flex-shrink:0; }
+  .print-footer .phones { display:flex; gap:8px; align-items:center; margin-top:0; justify-content:flex-start; direction:ltr; }
+  .print-footer .phone-badge { display:inline-flex; align-items:center; gap:6px; padding:4px 8px; background:#f1f5f9; border-radius:12px; color:#274156; text-decoration:none; border:1px solid rgba(39,65,86,0.06); font-size:12px; }
+  .print-footer .phone-badge svg { width:12px; height:12px; flex-shrink:0; }
   /* Visible separator line */
   .print-footer .separator { width:100%; height:2px; background:#d0d0d0; margin-bottom:8px; border-radius:1px; }
   /* Page number styling - uses CSS counter(page) for current page in print */
@@ -122,16 +138,35 @@ function buildPrintFooterHTML() {
 
   const logoHtml = footerLogo ? `<img src="${footerLogo}" class="footer-logo" alt="footer-logo"/>` : '';
 
+  const emailHtml = email ? `<a href="mailto:${email}" class="footer-email" aria-label="email"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M3 6.5L12 13l9-6.5" stroke="#2c3e50" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><rect x="3" y="5" width="18" height="14" rx="2" stroke="#2c3e50" stroke-width="1.2" fill="none"/></svg><span class="email-text">${email}</span></a>` : '';
+
+  const phonesHtml = (phone1 || phone2) ? `
+    ${phone1 ? `<a href="tel:${phone1}" class="phone-badge" aria-label="phone">` +
+      `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.86 19.86 0 0 1 3.08 5.18 2 2 0 0 1 5 3h3a2 2 0 0 1 2 1.72c.12 1.05.38 2.07.78 3.03a2 2 0 0 1-.45 2.11L9.91 12.09a15.05 15.05 0 0 0 6 6l1.23-1.23a2 2 0 0 1 2.11-.45c.96.4 1.98.66 3.03.78A2 2 0 0 1 22 16.92z" stroke="#274156" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>${phone1}</span></a>` : ''}
+    ${phone2 ? `<a href="tel:${phone2}" class="phone-badge" aria-label="phone">` +
+      `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.86 19.86 0 0 1 3.08 5.18 2 2 0 0 1 5 3h3a2 2 0 0 1 2 1.72c.12 1.05.38 2.07.78 3.03a2 2 0 0 1-.45 2.11L9.91 12.09a15.05 15.05 0 0 0 6 6l1.23-1.23a2 2 0 0 1 2.11-.45c.96.4 1.98.66 3.03.78A2 2 0 0 1 22 16.92z" stroke="#274156" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>${phone2}</span></a>` : ''}
+  ` : '';
+
   const html = `
     ${footerStyles}
     <div class="print-footer" role="contentinfo">
       <div class="separator" aria-hidden="true"></div>
       <div class="row">
-        <div class="col-right">${address}</div>
+        <div class="col-right">
+          <div class="footer-address" aria-label="address">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 21s-6.5-4.35-8.5-8.5C2.5 8.36 6.03 4 12 4s9.5 4.36 8.5 8.5C18.5 16.65 12 21 12 21z" stroke="#2c5aa0" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="10" r="2" stroke="#2c5aa0" stroke-width="1.2"/></svg>
+            <div>
+              <span class="addr-text">${address}</span>
+              <span class="addr-sub"></span>
+            </div>
+          </div>
+        </div>
         <div class="col-center">${logoHtml}</div>
         <div class="col-left">
-          <div class="email">${email}</div>
-          <div class="phones">${phone1 ? phone1 : ''}${phone1 && phone2 ? ' - ' : ''}${phone2 ? phone2 : ''}</div>
+          <div class="footer-contact">
+            ${emailHtml}
+            <div class="phones">${phonesHtml}</div>
+          </div>
         </div>
       </div>
       <div style="display:flex; align-items:center; justify-content:space-between; width:100%; margin-top:6px;">

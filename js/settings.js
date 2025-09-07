@@ -19,6 +19,10 @@ document.addEventListener('DOMContentLoaded', () => {
               <input id="settingCompanyName" class="form-control" maxlength="60" />
             </div>
             <div class="mb-3">
+              <label class="form-label">سطر وصف الشركة (سطرٌ ثانٍ)</label>
+              <input id="settingCompanySubtitle" class="form-control" maxlength="80" />
+            </div>
+            <div class="mb-3">
               <label class="form-label">خط العرض (التطبيق والطباعة)</label>
               <!-- options are populated dynamically based on font detection -->
               <select id="settingAppFont" class="form-select">
@@ -253,6 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Populate the font select with detected installed fonts and select saved font
             populateFontSelect(settings.appFont || 'Cairo');
             document.getElementById('settingCompanyName').value = settings.companyName || '';
+            document.getElementById('settingCompanySubtitle').value = settings.companySubtitle || '';
             const preview = document.getElementById('settingsPreviewBox');
             preview.innerHTML = buildBrandedHeaderHTML('معاينة');
             // Watermark inputs
@@ -351,6 +356,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('saveSettingsBtn')?.addEventListener('click', () => {
         const programName = document.getElementById('settingProgramName').value.trim();
         const companyName = document.getElementById('settingCompanyName').value.trim();
+        const companySubtitle = document.getElementById('settingCompanySubtitle')?.value.trim() || '';
   const logoDataUrl = document.getElementById('settingLogoFile').dataset.dataUrl || null;
   const appFont = document.getElementById('settingAppFont').value || 'Cairo';
   // Watermark values
@@ -363,7 +369,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const settings = StorageManager.getData(StorageManager.STORAGE_KEYS.SETTINGS) || {};
         settings.programName = programName || settings.programName || 'نظام المحاسبة';
-        settings.companyName = companyName || settings.companyName || 'شركة المقاولات المتقدمة';
+  settings.companyName = companyName || settings.companyName || 'شركة المقاولات المتقدمة';
+  settings.companySubtitle = companySubtitle || settings.companySubtitle || '';
     settings.appFont = appFont || settings.appFont || 'Cairo';
   settings.watermark = settings.watermark || {};
   settings.watermark.enabled = wmEnabled;

@@ -123,6 +123,7 @@ class StorageManager {
                 backupInterval: 3600000, // 1 hour
                 programName: 'نظام المحاسبة',
                 companyName: 'شركة المقاولات المتقدمة',
+                companySubtitle: '',
                 printLogoDataUrl: null,
                 appFont: 'Cairo',
                 // Watermark settings for printed pages
