@@ -2550,6 +2550,7 @@ class ExpensesManager {
             <body>
                 ${headerHTML}
                 <div class="print-body">${contentEl.innerHTML}</div>
+                ${buildPrintFooterHTML ? buildPrintFooterHTML() : ''}
             </body>
             </html>`;
 
@@ -2588,6 +2589,7 @@ class ExpensesManager {
             <body>
                 ${headerHTML}
                 <div class="print-body">${el.innerHTML}</div>
+                ${buildPrintFooterHTML ? buildPrintFooterHTML() : ''}
             </body>
             </html>
         `;

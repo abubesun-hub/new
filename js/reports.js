@@ -486,12 +486,13 @@ class ReportsManager {
             </head>
             <body>
                 ${header}
-                <div class="report-content">${content}</div>
+                <div class="print-body">${content}</div>
+                ${buildPrintFooterHTML ? buildPrintFooterHTML() : ''}
             </body>
-            </html>
-        `;
+            </html>`;
 
         const win = window.open('', '_blank', 'width=1100,height=800');
+        win.document.open();
         win.document.write(printHTML);
         win.document.close();
         win.onload = () => win.print();

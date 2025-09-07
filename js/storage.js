@@ -120,7 +120,27 @@ class StorageManager {
                 currency: 'USD',
                 language: 'ar',
                 autoBackup: true,
-                backupInterval: 3600000 // 1 hour
+                backupInterval: 3600000, // 1 hour
+                programName: 'نظام المحاسبة',
+                companyName: 'شركة المقاولات المتقدمة',
+                printLogoDataUrl: null,
+                appFont: 'Cairo',
+                // Watermark settings for printed pages
+                watermark: {
+                    enabled: false,
+                    text: '',
+                    opacity: 8, // percentage (0-100)
+                    fontSize: 96,
+                    rotate: -30
+                },
+                // Footer defaults for printed pages
+                footer: {
+                    address: 'الدولة - المحافظة - بقية العنوان',
+                    footerLogoDataUrl: null,
+                    email: 'info@example.com',
+                    phone1: '',
+                    phone2: ''
+                }
             };
             this.saveData(this.STORAGE_KEYS.SETTINGS, defaultSettings);
         }

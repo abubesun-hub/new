@@ -900,6 +900,7 @@ class AccountingApp {
                 <div style="margin-top: 50px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #ddd; padding-top: 20px;">
                     تم إنشاء هذا التقرير بواسطة نظام المحاسبة الإلكتروني - شركة المقاولات المتقدمة
                 </div>
+                ${buildPrintFooterHTML ? buildPrintFooterHTML() : ''}
             </body>
             </html>
         `;

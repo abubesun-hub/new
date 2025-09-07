@@ -1143,6 +1143,7 @@ class CapitalManager {
             <body>
                 ${header}
                 <div class="receipt-body">${receiptBody}</div>
+                ${buildPrintFooterHTML ? buildPrintFooterHTML() : ''}
             </body>
             </html>
         `;
@@ -1185,6 +1186,7 @@ class CapitalManager {
             <body>
                 ${header}
                 <div class="receipt-body">${receiptBody}</div>
+                ${buildPrintFooterHTML ? buildPrintFooterHTML() : ''}
             </body>
             </html>
         `;
