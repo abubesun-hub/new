@@ -1154,9 +1154,11 @@ class CapitalManager {
         printWindow.document.write(fullHTML);
         printWindow.document.close();
 
-        // Wait for content to load then print
+        // Wait for content to load then print (small delay to let browser compute page counters)
         printWindow.onload = function() {
-            printWindow.print();
+            setTimeout(() => {
+                try { printWindow.print(); } catch (e) { console.error('Print failed', e); }
+            }, 300);
         };
     }
 
@@ -1198,9 +1200,11 @@ class CapitalManager {
         printWindow.document.write(fullHTML);
         printWindow.document.close();
 
-        // Wait for content to load then print
+        // Wait for content to load then print (small delay to let browser compute page counters)
         printWindow.onload = function() {
-            printWindow.print();
+            setTimeout(() => {
+                try { printWindow.print(); } catch (e) { console.error('Print failed', e); }
+            }, 300);
         };
     }
 

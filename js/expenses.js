@@ -1234,9 +1234,11 @@ class ExpensesManager {
         printWindow.document.write(fullHTML);
         printWindow.document.close();
 
-        // Wait for content to load then print
+        // Wait for content to load then print (small delay to let browser compute page counters)
         printWindow.onload = function() {
-            printWindow.print();
+            setTimeout(() => {
+                try { printWindow.print(); } catch (e) { console.error('Print failed', e); }
+            }, 300);
         };
     }
 
@@ -1720,9 +1722,11 @@ class ExpensesManager {
         printWindow.document.write(printHTML);
         printWindow.document.close();
 
-        // Wait for content to load then print
+        // Wait for content to load then print (small delay to let browser compute page counters)
         printWindow.onload = function() {
-            printWindow.print();
+            setTimeout(() => {
+                try { printWindow.print(); } catch (e) { console.error('Print failed', e); }
+            }, 300);
         };
     }
 
@@ -1730,6 +1734,7 @@ class ExpensesManager {
     generateAccountingGuidePrintHTML(groupedGuide) {
         const currentDate = new Date().toLocaleDateString('ar-IQ');
         const currentTime = new Date().toLocaleTimeString('ar-IQ');
+    const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('الدليل المحاسبي للمصروفات') : '';
 
         let contentHTML = '';
         Object.keys(groupedGuide).forEach(category => {
@@ -1760,7 +1765,7 @@ class ExpensesManager {
             `;
         });
 
-        return `
+    return `
         <!DOCTYPE html>
         <html lang="ar" dir="rtl">
         <head>
@@ -1854,17 +1859,11 @@ class ExpensesManager {
             </style>
         </head>
         <body>
-            <div class="header">
-                <div class="company-name">شركة المقاولات المتقدمة</div>
-                <div class="guide-title">الدليل المحاسبي للمصروفات</div>
-                <div class="print-date">تاريخ الطباعة: ${currentDate} - ${currentTime}</div>
-            </div>
+            ${header}
 
-            ${contentHTML}
+            <div class="print-body">${contentHTML}</div>
 
-            <div style="margin-top: 50px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #ddd; padding-top: 20px;">
-                تم إنشاء هذا الدليل بواسطة نظام المحاسبة الإلكتروني - شركة المقاولات المتقدمة
-            </div>
+            ${buildPrintFooterHTML ? buildPrintFooterHTML() : ''}
         </body>
         </html>
         `;

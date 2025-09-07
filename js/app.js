@@ -907,7 +907,11 @@ class AccountingApp {
 
         printWindow.document.write(printHTML);
         printWindow.document.close();
-        printWindow.onload = () => printWindow.print();
+        printWindow.onload = () => {
+            setTimeout(() => {
+                try { printWindow.print(); } catch (e) { console.error('Print failed', e); }
+            }, 300);
+        };
     }
 
     // Export capital report
@@ -1328,7 +1332,11 @@ class AccountingApp {
 
         printWindow.document.write(printHTML);
         printWindow.document.close();
-        printWindow.onload = () => printWindow.print();
+        printWindow.onload = () => {
+            setTimeout(() => {
+                try { printWindow.print(); } catch (e) { console.error('Print failed', e); }
+            }, 300);
+        };
     }
 
     // Export expenses report

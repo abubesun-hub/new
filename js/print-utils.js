@@ -132,7 +132,11 @@ function buildPrintFooterHTML() {
   }
   .print-footer .page-number:before { content: "الصفحة "; margin-right:6px; }
   .print-footer .page-number:after { content: counter(page); }
-      @media print { .print-footer { position:fixed; } }
+      @media print {
+        .print-footer { position:fixed; }
+        /* Ensure the footer page-number is visible in print — we rely on counter(page) here */
+        .print-footer .page-number { display:inline-block !important; }
+      }
     </style>
   `;
 
@@ -170,8 +174,12 @@ function buildPrintFooterHTML() {
         </div>
       </div>
       <div style="display:flex; align-items:center; justify-content:space-between; width:100%; margin-top:6px;">
-        <div class="page-number">&nbsp;</div>
         <div style="width:120px;"></div>
+        <div></div>
+      </div>
+      <!-- Third line: page number on the right -->
+      <div style="display:flex; align-items:center; justify-content:flex-end; width:100%; margin-top:6px;">
+        <div class="page-number">&nbsp;</div>
       </div>
     </div>
   `;
