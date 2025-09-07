@@ -84,13 +84,38 @@ function buildPrintFooterHTML() {
 
   const footerStyles = `
     <style>
-      .print-footer { position:fixed; left:0; right:0; bottom:0; background:transparent; padding:8px 12px; font-size:12px; color:#333; z-index:4; }
-      .print-footer .row { display:flex; align-items:center; justify-content:space-between; }
+  /* Ensure page content leaves space for footer and show a separator line */
+  body { padding-bottom: 140px; }
+  /* Footer visual container */
+  .print-footer { position:fixed; left:0; right:0; bottom:0; background:rgba(255,255,255,0.98); padding:10px 14px; font-size:12px; color:#333; z-index:4; box-shadow: 0 -2px 8px rgba(0,0,0,0.05); }
+  .print-footer .row { display:flex; align-items:center; justify-content:space-between; }
       .print-footer .col-right { text-align:right; flex:1; }
       .print-footer .col-center { text-align:center; flex:1; }
       .print-footer .col-left { text-align:left; flex:1; }
-      .print-footer .footer-logo { height:36px; display:inline-block; }
-      .print-footer .phones { text-align:center; width:100%; margin-top:6px; }
+  .print-footer .footer-logo { height:36px; display:inline-block; }
+  .print-footer .phones { text-align:left; margin-top:4px; display:block; }
+  /* Visible separator line */
+  .print-footer .separator { width:100%; height:2px; background:#d0d0d0; margin-bottom:8px; border-radius:1px; }
+  /* Page number styling - uses CSS counter(page) for current page in print */
+  /* Page number as a compact badge */
+  .print-footer .page-number { 
+    display:inline-block; 
+    direction:rtl; 
+    font-weight:700; 
+    background:#2c5aa0; 
+    color:#fff; 
+    padding:4px 10px; 
+    border-radius:16px; 
+    box-shadow:0 1px 4px rgba(0,0,0,0.12);
+    font-size:12px;
+    min-width:64px;
+    text-align:center;
+    line-height:1;
+    -webkit-print-color-adjust:exact; /* try to preserve background color in print */
+    border:1px solid rgba(44,90,160,0.95);
+  }
+  .print-footer .page-number:before { content: "الصفحة "; margin-right:6px; }
+  .print-footer .page-number:after { content: counter(page); }
       @media print { .print-footer { position:fixed; } }
     </style>
   `;
@@ -100,12 +125,19 @@ function buildPrintFooterHTML() {
   const html = `
     ${footerStyles}
     <div class="print-footer" role="contentinfo">
+      <div class="separator" aria-hidden="true"></div>
       <div class="row">
         <div class="col-right">${address}</div>
         <div class="col-center">${logoHtml}</div>
-        <div class="col-left">${email}</div>
+        <div class="col-left">
+          <div class="email">${email}</div>
+          <div class="phones">${phone1 ? phone1 : ''}${phone1 && phone2 ? ' - ' : ''}${phone2 ? phone2 : ''}</div>
+        </div>
       </div>
-      <div class="phones">${phone1 ? phone1 : ''}${phone1 && phone2 ? ' - ' : ''}${phone2 ? phone2 : ''}</div>
+      <div style="display:flex; align-items:center; justify-content:space-between; width:100%; margin-top:6px;">
+        <div class="page-number">&nbsp;</div>
+        <div style="width:120px;"></div>
+      </div>
     </div>
   `;
 

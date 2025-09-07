@@ -39,6 +39,13 @@ document.addEventListener('DOMContentLoaded', () => {
               <div class="mb-2">
                 <input id="settingWatermarkText" class="form-control" placeholder="نص العلامة المائية (مثال: مسودة)" />
               </div>
+              <div class="mb-2">
+                <label class="form-label small">مظهر العلامة المائية</label>
+                <select id="settingWatermarkMode" class="form-select">
+                  <option value="behind">خلف المحتوى (خفيفة)</option>
+                  <option value="over">فوق المحتوى (تغطي)</option>
+                </select>
+              </div>
               <div class="row">
                 <div class="col-4">
                   <label class="form-label small">شفافية %</label>
@@ -191,6 +198,43 @@ document.addEventListener('DOMContentLoaded', () => {
       try { sel.value = selectedFont || 'Cairo'; } catch (e) { sel.selectedIndex = 0; }
     }
 
+    // Image resize helper: returns Promise resolving to dataURL
+    function resizeImageFileToDataURL(file, maxWidth = 800, maxHeight = 800, quality = 0.85) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          img.onload = function() {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            if (width > maxWidth) {
+              height = Math.round((maxWidth / width) * height);
+              width = maxWidth;
+            }
+            if (height > maxHeight) {
+              width = Math.round((maxHeight / height) * width);
+              height = maxHeight;
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            try {
+              const dataUrl = canvas.toDataURL('image/png', quality);
+              resolve(dataUrl);
+            } catch (err) {
+              reject(err);
+            }
+          };
+          img.onerror = function(err) { reject(err); };
+          img.src = e.target.result;
+        };
+        reader.onerror = function(err) { reject(err); };
+        reader.readAsDataURL(file);
+      });
+    }
+
     // Add Settings button to header actions
     const headerActions = document.querySelector('.header-actions');
     if (headerActions) {
@@ -218,6 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('settingWatermarkOpacity').value = wm.opacity || 8;
             document.getElementById('settingWatermarkSize').value = wm.fontSize || 96;
             document.getElementById('settingWatermarkRotate').value = wm.rotate || -30;
+            document.getElementById('settingWatermarkMode').value = wm.mode || 'behind';
             // Footer inputs
             const ft = settings.footer || { address: '', footerLogoDataUrl: null, email: '', phone1: '', phone2: '' };
             document.getElementById('settingFooterAddress').value = ft.address || '';
@@ -238,20 +283,24 @@ document.addEventListener('DOMContentLoaded', () => {
         logoInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
-            if (file.size > 150000) {
-                alert('حجم الصورة كبير جداً، الرجاء استخدام صورة أصغر من 150KB');
-            }
-            const reader = new FileReader();
-            reader.onload = function(evt) {
-                const dataUrl = evt.target.result;
-                document.getElementById('settingLogoPreview').innerHTML = `<img src="${dataUrl}" style="height:48px;"/>`;
-                // store temporarily on input element
-                logoInput.dataset.dataUrl = dataUrl;
-                // update preview box
-                const preview = document.getElementById('settingsPreviewBox');
-                preview.innerHTML = buildBrandedHeaderHTML('معاينة');
-            };
-            reader.readAsDataURL(file);
+      // Resize image to reasonable bounds before storing to reduce localStorage usage
+      resizeImageFileToDataURL(file, 300, 300, 0.9).then(dataUrl => {
+        document.getElementById('settingLogoPreview').innerHTML = `<img src="${dataUrl}" style="height:48px;"/>`;
+        logoInput.dataset.dataUrl = dataUrl;
+        const preview = document.getElementById('settingsPreviewBox');
+        preview.innerHTML = buildBrandedHeaderHTML('معاينة');
+      }).catch(err => {
+        // fallback to original file if resize fails
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          const dataUrl = evt.target.result;
+          document.getElementById('settingLogoPreview').innerHTML = `<img src="${dataUrl}" style="height:48px;"/>`;
+          logoInput.dataset.dataUrl = dataUrl;
+          const preview = document.getElementById('settingsPreviewBox');
+          preview.innerHTML = buildBrandedHeaderHTML('معاينة');
+        };
+        reader.readAsDataURL(file);
+      });
         });
     }
 
@@ -261,18 +310,35 @@ document.addEventListener('DOMContentLoaded', () => {
       footerLogoInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        if (file.size > 200000) {
-          alert('حجم صورة التذييل كبير جداً، استخدم صورة أصغر من 200KB');
-        }
-        const reader = new FileReader();
-        reader.onload = function(evt) {
-          const dataUrl = evt.target.result;
+        // resize footer logo to small size
+        resizeImageFileToDataURL(file, 200, 80, 0.9).then(dataUrl => {
           document.getElementById('settingFooterLogoPreview').innerHTML = `<img src="${dataUrl}" style="height:36px; display:block; margin:0 auto;"/>`;
           footerLogoInput.dataset.dataUrl = dataUrl;
-        };
-        reader.readAsDataURL(file);
+        }).catch(err => {
+          const reader = new FileReader();
+          reader.onload = function(evt) {
+            const dataUrl = evt.target.result;
+            document.getElementById('settingFooterLogoPreview').innerHTML = `<img src="${dataUrl}" style="height:36px; display:block; margin:0 auto;"/>`;
+            footerLogoInput.dataset.dataUrl = dataUrl;
+          };
+          reader.readAsDataURL(file);
+        });
       });
     }
+
+    // Live preview updates when watermark or footer inputs change
+    ['settingWatermarkEnabled','settingWatermarkText','settingWatermarkOpacity','settingWatermarkSize','settingWatermarkRotate','settingFooterAddress','settingFooterEmail','settingFooterPhone1','settingFooterPhone2'].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('input', () => {
+        const preview = document.getElementById('settingsPreviewBox');
+        preview.innerHTML = buildBrandedHeaderHTML('معاينة');
+      });
+      el.addEventListener('change', () => {
+        const preview = document.getElementById('settingsPreviewBox');
+        preview.innerHTML = buildBrandedHeaderHTML('معاينة');
+      });
+    });
 
     // Clear logo
     document.getElementById('clearLogoBtn')?.addEventListener('click', () => {
@@ -293,6 +359,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const wmOpacity = parseInt(document.getElementById('settingWatermarkOpacity').value || '8', 10);
   const wmSize = parseInt(document.getElementById('settingWatermarkSize').value || '96', 10);
   const wmRotate = parseInt(document.getElementById('settingWatermarkRotate').value || '-30', 10);
+  const wmMode = document.getElementById('settingWatermarkMode')?.value || 'behind';
 
         const settings = StorageManager.getData(StorageManager.STORAGE_KEYS.SETTINGS) || {};
         settings.programName = programName || settings.programName || 'نظام المحاسبة';
@@ -304,6 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
   settings.watermark.opacity = isNaN(wmOpacity) ? (settings.watermark.opacity || 8) : Math.max(0, Math.min(100, wmOpacity));
   settings.watermark.fontSize = isNaN(wmSize) ? (settings.watermark.fontSize || 96) : Math.max(20, Math.min(300, wmSize));
   settings.watermark.rotate = isNaN(wmRotate) ? (settings.watermark.rotate || -30) : Math.max(-180, Math.min(180, wmRotate));
+  settings.watermark.mode = wmMode || settings.watermark.mode || 'behind';
         if (logoDataUrl) settings.printLogoDataUrl = logoDataUrl;
         else if (!document.getElementById('settingLogoPreview').innerHTML) settings.printLogoDataUrl = null;
   // footer

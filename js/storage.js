@@ -131,7 +131,8 @@ class StorageManager {
                     text: '',
                     opacity: 8, // percentage (0-100)
                     fontSize: 96,
-                    rotate: -30
+                    rotate: -30,
+                    mode: 'behind' // 'behind' or 'over'
                 },
                 // Footer defaults for printed pages
                 footer: {
