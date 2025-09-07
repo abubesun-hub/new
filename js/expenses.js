@@ -2658,8 +2658,9 @@ class ExpensesManager {
         const formData = this.getExpenseFormData();
         if (!formData) return;
 
-        // Create new window for printing
-        const printWindow = window.open('', '_blank', 'width=800,height=600');
+    // Create new window for printing
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('فاتورة مصروف') : '';
 
         // Get accounting guide details
         const accountingSelect = document.getElementById('expenseAccountingGuide');
@@ -2680,22 +2681,6 @@ class ExpensesManager {
                     background: white;
                     color: #333;
                     line-height: 1.6;
-                }
-                .header {
-                    text-align: center;
-                    border-bottom: 3px solid #2c5aa0;
-                    padding-bottom: 20px;
-                    margin-bottom: 30px;
-                }
-                .header h1 {
-                    color: #2c5aa0;
-                    margin: 0;
-                    font-size: 28px;
-                }
-                .header h2 {
-                    color: #666;
-                    margin: 10px 0;
-                    font-size: 18px;
                 }
                 .info-table {
                     width: 100%;
@@ -2754,11 +2739,7 @@ class ExpensesManager {
             </style>
         </head>
         <body>
-            <div class="header">
-                <h1>فاتورة مصروف</h1>
-                <h2>نظام إدارة المصروفات</h2>
-                <p>تاريخ الطباعة: ${new Date().toLocaleDateString('ar-EG')}</p>
-            </div>
+            ${header}
 
             <table class="info-table">
                 <tr>
@@ -2825,10 +2806,7 @@ class ExpensesManager {
                 </div>
             </div>
 
-            <div class="footer">
-                <p>تم إنشاء هذه الفاتورة بواسطة نظام إدارة المصروفات</p>
-                <p>${new Date().toLocaleString('ar-EG')}</p>
-            </div>
+            ${buildPrintFooterHTML ? buildPrintFooterHTML() : ''}
 
             <div class="no-print" style="text-align: center; margin-top: 30px;">
                 <button onclick="window.print()" style="background: #2c5aa0; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px;">طباعة</button>
