@@ -117,24 +117,25 @@
                     </div>
                     <div class="col-md-6 text-start">
                         <div class="header-actions">
-                            <span class="user-welcome">مرحباً، <span id="currentUser">المدير</span></span>
+                            <!-- سيتم إدراج زر الإعدادات أولاً برمجياً من settings.js عبر prepend -->
+                            <label class="btn btn-outline-success neumorphic-btn ms-3" style="margin-bottom:0;">
+                                <i class="bi bi-upload me-1"></i>
+                                استيراد البيانات
+                                <input type="file" id="importFileInput" style="display:none" accept="application/json" onchange="handleImportFile(event)">
+                            </label>
+                            <button class="btn btn-outline-primary neumorphic-btn ms-3" onclick="StorageManager.exportData()">
+                                <i class="bi bi-download me-1"></i>
+                                تصدير البيانات
+                            </button>
                             <button class="btn btn-outline-danger neumorphic-btn ms-3" onclick="logout()" title="تبديل الحساب">
                                 <i class="bi bi-box-arrow-right me-1"></i>
                                 تبديل الحساب
                             </button>
-                           <button class="btn btn-outline-warning neumorphic-btn ms-3" onclick="simulateBrowserExit()" title="إغلاق البرنامج">
-                               <i class="bi bi-window-close me-1"></i>
-                               إغلاق البرنامج
-                           </button>
-                               <button class="btn btn-outline-primary neumorphic-btn ms-3" onclick="StorageManager.exportData()">
-                                   <i class="bi bi-download me-1"></i>
-                                   تصدير البيانات
-                               </button>
-                               <label class="btn btn-outline-success neumorphic-btn ms-3" style="margin-bottom:0;">
-                                   <i class="bi bi-upload me-1"></i>
-                                   استيراد البيانات
-                                   <input type="file" id="importFileInput" style="display:none" accept="application/json" onchange="handleImportFile(event)">
-                               </label>
+                            <span class="user-welcome ms-3">مرحباً، <span id="currentUser">المدير</span></span>
+                            <button class="btn btn-outline-warning neumorphic-btn ms-3" onclick="simulateBrowserExit()" title="إغلاق البرنامج">
+                                <i class="bi bi-window-close me-1"></i>
+                                إغلاق البرنامج
+                            </button>
                         </div>
                     </div>
                 </div>
