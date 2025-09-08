@@ -49,9 +49,7 @@ class ExpensesManager {
                                     </a>
                                 </li>
                                 <li class="nav-item">
-                                    <a class="nav-link" href="#" onclick="expensesManager.showView('search')">
-                                        <i class="bi bi-search me-2"></i>البحث
-                                    </a>
+                                    
                                 </li>
                                 <li class="nav-item">
                                     <a class="nav-link" href="#" onclick="expensesManager.showView('accounting-guide')">
@@ -100,9 +98,6 @@ class ExpensesManager {
                 break;
             case 'edit-expenses':
                 this.loadEditExpensesView();
-                break;
-            case 'search':
-                this.loadSearchView();
                 break;
             case 'accounting-guide':
                 console.log('Loading accounting guide view...');
