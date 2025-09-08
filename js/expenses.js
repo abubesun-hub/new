@@ -573,19 +573,285 @@ class ExpensesManager {
 
     // Load edit expenses view (placeholder)
     loadEditExpensesView() {
+        const categories = this.getExpenseCategories();
+        const data = StorageManager.getAllData();
         const editExpensesHTML = `
-            <div class="neumorphic-card">
-                <div class="card-header">
-                    <h4><i class="bi bi-pencil-square me-2"></i>تعديل المصروفات</h4>
+            <div class="neumorphic-card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0"><i class="bi bi-pencil-square me-2"></i>تعديل المصروفات</h4>
+                    <div class="text-muted small">${(data.expenses || []).length} قيد</div>
                 </div>
-                <div class="card-body text-center">
-                    <i class="bi bi-tools display-1 text-muted"></i>
-                    <h4 class="mt-3 text-muted">قيد التطوير</h4>
-                    <p class="text-muted">ستتوفر هذه الميزة قريباً</p>
+                <div class="card-body">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label"><i class="bi bi-calendar me-1"></i>من تاريخ</label>
+                            <input type="date" id="editFilterFrom" class="form-control neumorphic-input">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label"><i class="bi bi-calendar2-week me-1"></i>إلى تاريخ</label>
+                            <input type="date" id="editFilterTo" class="form-control neumorphic-input">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label"><i class="bi bi-tags me-1"></i>الفئة</label>
+                            <select id="editFilterCategory" class="form-control neumorphic-input">
+                                <option value="">الكل</option>
+                                ${categories.map(c => `<option value="${c}">${c}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label"><i class="bi bi-currency-exchange me-1"></i>العملة</label>
+                            <select id="editFilterCurrency" class="form-control neumorphic-input">
+                                <option value="">الكل</option>
+                                <option value="USD">دولار</option>
+                                <option value="IQD">دينار</option>
+                                <option value="MIXED">مختلط</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="bi bi-search me-1"></i>بحث (رقم القيد، البيان، المستفيد، المورد)</label>
+                            <input type="text" id="editFilterQuery" class="form-control neumorphic-input" placeholder="اكتب للبحث...">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label"><i class="bi bi-hash me-1"></i>رقم القيد</label>
+                            <input type="text" id="editFilterReg" class="form-control neumorphic-input" placeholder="مثال: 20250908...">
+                        </div>
+                        <div class="col-md-3 d-flex gap-2">
+                            <button id="editFilterApply" class="btn btn-primary neumorphic-btn flex-grow-1"><i class="bi bi-funnel me-1"></i>تطبيق</button>
+                            <button id="editFilterReset" class="btn btn-secondary neumorphic-btn"><i class="bi bi-arrow-counterclockwise me-1"></i>إعادة</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="neumorphic-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-list-ul me-2"></i>قائمة القيود</h5>
+                    <div class="d-flex gap-2">
+                        <button id="editBulkExport" class="btn btn-success btn-sm neumorphic-btn" title="تصدير (قريباً)" disabled>
+                            <i class="bi bi-file-earmark-excel me-1"></i>تصدير
+                        </button>
+                        <button id="editBulkDelete" class="btn btn-danger btn-sm neumorphic-btn" title="حذف المحدد (قريباً)" disabled>
+                            <i class="bi bi-trash me-1"></i>حذف المحدد
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="editExpensesTable" class="table-responsive"></div>
                 </div>
             </div>
         `;
         document.getElementById('expensesContent').innerHTML = editExpensesHTML;
+        this.setupEditFilters();
+        this.renderEditTable(data.expenses || []);
+    }
+
+    // Setup edit filters and actions
+    setupEditFilters() {
+        const apply = document.getElementById('editFilterApply');
+        const reset = document.getElementById('editFilterReset');
+        const q = document.getElementById('editFilterQuery');
+
+        const run = () => {
+            const all = StorageManager.getAllData().expenses || [];
+            const filtered = this.getFilteredExpenses(all);
+            this.renderEditTable(filtered);
+        };
+
+        apply?.addEventListener('click', run);
+        reset?.addEventListener('click', () => {
+            ['editFilterFrom','editFilterTo','editFilterCategory','editFilterCurrency','editFilterQuery','editFilterReg']
+                .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+            run();
+        });
+        // instant search on typing
+        q?.addEventListener('input', () => {
+            // throttle-lite
+            clearTimeout(this._editSearchTimer);
+            this._editSearchTimer = setTimeout(run, 250);
+        });
+    }
+
+    // Collect filters and filter list
+    getFilteredExpenses(list) {
+        const from = document.getElementById('editFilterFrom')?.value;
+        const to = document.getElementById('editFilterTo')?.value;
+        const cat = document.getElementById('editFilterCategory')?.value || '';
+        const cur = document.getElementById('editFilterCurrency')?.value || '';
+        const query = (document.getElementById('editFilterQuery')?.value || '').trim().toLowerCase();
+        const reg = (document.getElementById('editFilterReg')?.value || '').trim();
+
+        return (list || []).filter(e => {
+            // date range
+            if (from && new Date(e.date) < new Date(from)) return false;
+            if (to && new Date(e.date) > new Date(to)) return false;
+            // category
+            if (cat && (e.category || '') !== cat) return false;
+            // currency mode
+            if (cur) {
+                if (cur === 'MIXED') {
+                    if (!(e.amountIQD > 0 && e.amountUSD > 0)) return false;
+                } else {
+                    const primary = e.currency || this.determinePrimaryCurrency(e.amountIQD||0, e.amountUSD||0, e.exchangeRate||1500);
+                    if (primary !== cur) return false;
+                }
+            }
+            // registration number exact or begins-with
+            if (reg && !(e.registrationNumber || '').toString().startsWith(reg)) return false;
+            // text query in a few fields
+            if (query) {
+                const hay = [e.description, e.beneficiary, e.vendor, e.accountingGuideName, e.accountingGuideCode, e.project]
+                    .map(v => (v || '').toString().toLowerCase())
+                    .join(' | ');
+                if (!hay.includes(query)) return false;
+            }
+            return true;
+        }).sort((a,b) => new Date(b.date) - new Date(a.date));
+    }
+
+    // Render edit table
+    renderEditTable(expenses) {
+        const wrap = document.getElementById('editExpensesTable');
+        if (!wrap) return;
+        if (!expenses || expenses.length === 0) {
+            wrap.innerHTML = '<div class="text-center text-muted py-4"><i class="bi bi-inbox display-6"></i><div class="mt-2">لا توجد قيود مطابقة</div></div>';
+            return;
+        }
+
+        const rows = expenses.map(e => {
+            const usdTxt = (e.amountUSD && e.amountUSD > 0) ? this.formatCurrency(e.amountUSD, 'USD') : '<span class="text-muted">-</span>';
+            const iqdTxt = (e.amountIQD && e.amountIQD > 0) ? this.formatCurrency(e.amountIQD, 'IQD') : '<span class="text-muted">-</span>';
+            const badge = this.getTransactionTypeDescription(e.amountIQD||0, e.amountUSD||0);
+            return `
+                <tr>
+                    <td><strong>${e.registrationNumber || ''}</strong><br><small class="text-muted">${this.formatDate(e.date)}</small></td>
+                    <td>${e.description || 'بدون وصف'}<div class="mt-1">${badge}</div></td>
+                    <td class="text-success">${usdTxt}</td>
+                    <td class="text-info">${iqdTxt}</td>
+                    <td>${e.category || '<span class="text-muted">غير محدد</span>'}</td>
+                    <td>${e.beneficiary || '<span class="text-muted">-</span>'}</td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary" title="تعديل" onclick="expensesManager.startEditExpense('${e.id}')"><i class="bi bi-pencil"></i></button>
+                            <button class="btn btn-outline-success" title="طباعة" onclick="expensesManager.printExpenseById('${e.id}','${e.registrationNumber||''}')"><i class="bi bi-printer"></i></button>
+                            <button class="btn btn-outline-secondary" title="تكرار" onclick="expensesManager.duplicateExpense('${e.id}')"><i class="bi bi-copy"></i></button>
+                            <button class="btn btn-outline-danger" title="حذف" onclick="expensesManager.deleteExpense('${e.id}')"><i class="bi bi-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>`;
+        }).join('');
+
+        const html = `
+            <table class="table table-striped table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>القيد/التاريخ</th>
+                        <th>البيان</th>
+                        <th>دولار</th>
+                        <th>دينار</th>
+                        <th>الفئة</th>
+                        <th>المستفيد</th>
+                        <th>إجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        `;
+        wrap.innerHTML = html;
+    }
+
+    // Start editing: reuse Add form and prefill
+    startEditExpense(id) {
+        try {
+            const all = StorageManager.getAllData();
+            const entry = (all.expenses || []).find(e => e.id === id);
+            if (!entry) return this.showNotification('القيد غير موجود', 'error');
+
+            this.editingId = id;
+            this.showView('add-expense');
+
+            // wait for form to render
+            setTimeout(() => {
+                this.fillAddFormFromEntry(entry);
+                // Visual hint for editing mode
+                const form = document.getElementById('expenseForm');
+                if (form) {
+                    const submitBtn = form.querySelector('button[type="submit"]');
+                    if (submitBtn) submitBtn.innerHTML = '<i class="bi bi-save me-2"></i>تحديث المصروف';
+                    // Add cancel editing button once
+                    if (!document.getElementById('cancelEditBtn')) {
+                        const cancelBtn = document.createElement('button');
+                        cancelBtn.type = 'button';
+                        cancelBtn.id = 'cancelEditBtn';
+                        cancelBtn.className = 'btn btn-outline-secondary neumorphic-btn ms-2';
+                        cancelBtn.innerHTML = '<i class="bi bi-x-circle me-2"></i>إلغاء التعديل';
+                        cancelBtn.onclick = () => { this.editingId = null; this.showView('edit-expenses'); };
+                        submitBtn?.parentElement?.appendChild(cancelBtn);
+                    }
+                }
+                this.showNotification('وضع التعديل مفعل لهذا القيد', 'info');
+            }, 100);
+        } catch (err) {
+            console.error('startEditExpense error', err);
+            this.showNotification('حدث خطأ أثناء فتح القيد للتعديل', 'error');
+        }
+    }
+
+    // Prefill Add form with existing entry data
+    fillAddFormFromEntry(e) {
+        const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val ?? ''; };
+        set('expenseRegistrationNumber', e.registrationNumber || '');
+        set('expenseDate', e.date ? e.date.split('T')[0] : '');
+        set('expenseAmountIQD', e.amountIQD ?? '');
+        set('expenseAmountUSD', e.amountUSD ?? '');
+        set('expenseExchangeRate', e.exchangeRate ?? '1500');
+        set('expenseDescription', e.description || '');
+        set('expenseAccountingGuide', e.accountingGuide || '');
+        set('expenseBeneficiary', e.beneficiary || '');
+        set('expenseReceiptNumber', e.receiptNumber || '');
+        set('expenseReceiptDate', e.receiptDate ? e.receiptDate.split('T')[0] : '');
+        set('expenseVendor', e.vendor || '');
+        set('expensePaymentMethod', e.paymentMethod || '');
+        set('expenseCategory', e.category || '');
+        set('expenseProject', e.project || '');
+        set('expenseNotes', e.notes || '');
+        // ensure preview hidden in edit mode
+        const preview = document.getElementById('expensePreview');
+        if (preview) preview.style.display = 'none';
+    }
+
+    // Delete expense with confirm
+    deleteExpense(id) {
+        if (!confirm('هل أنت متأكد من حذف هذا القيد؟')) return;
+        if (StorageManager.deleteExpenseEntry(id)) {
+            this.showNotification('تم حذف القيد بنجاح', 'success');
+            const all = StorageManager.getAllData();
+            const filtered = this.getFilteredExpenses(all.expenses || []);
+            this.renderEditTable(filtered);
+        } else {
+            this.showNotification('فشل حذف القيد', 'error');
+        }
+    }
+
+    // Duplicate an expense
+    duplicateExpense(id) {
+        try {
+            const all = StorageManager.getAllData();
+            const entry = (all.expenses || []).find(e => e.id === id);
+            if (!entry) return this.showNotification('القيد غير موجود', 'error');
+            // Prepare copy without identifiers/timestamps
+            const { id: _id, registrationNumber: _r, createdAt: _c, updatedAt: _u, ...payload } = entry;
+            const newEntry = StorageManager.addExpenseEntry(payload);
+            if (newEntry) {
+                this.showNotification('تم تكرار القيد بنجاح', 'success');
+                const refreshed = StorageManager.getAllData().expenses || [];
+                this.renderEditTable(this.getFilteredExpenses(refreshed));
+            } else {
+                this.showNotification('تعذر تكرار القيد', 'error');
+            }
+        } catch (err) {
+            console.error('duplicateExpense error', err);
+            this.showNotification('حدث خطأ أثناء تكرار القيد', 'error');
+        }
     }
 
     // Load search view (placeholder)
