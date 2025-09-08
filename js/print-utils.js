@@ -112,30 +112,9 @@ function buildPrintFooterHTML() {
   .print-footer .phone-badge svg { width:12px; height:12px; flex-shrink:0; }
   /* Visible separator line */
   .print-footer .separator { width:100%; height:2px; background:#d0d0d0; margin-bottom:8px; border-radius:1px; }
-  /* Page number styling - uses CSS counter(page) for current page in print */
-  /* Page number as a compact badge */
-  .print-footer .page-number { 
-    display:inline-block; 
-    direction:rtl; 
-    font-weight:700; 
-    background:#2c5aa0; 
-    color:#fff; 
-    padding:4px 10px; 
-    border-radius:16px; 
-    box-shadow:0 1px 4px rgba(0,0,0,0.12);
-    font-size:12px;
-    min-width:64px;
-    text-align:center;
-    line-height:1;
-    -webkit-print-color-adjust:exact; /* try to preserve background color in print */
-    border:1px solid rgba(44,90,160,0.95);
-  }
-  .print-footer .page-number:before { content: "الصفحة "; margin-right:6px; }
-  .print-footer .page-number:after { content: counter(page); }
+  /* Footer visual adjustments for print; page numbers removed globally */
       @media print {
         .print-footer { position:fixed; }
-        /* Ensure the footer page-number is visible in print — we rely on counter(page) here */
-        .print-footer .page-number { display:inline-block !important; }
       }
     </style>
   `;
@@ -177,10 +156,7 @@ function buildPrintFooterHTML() {
         <div style="width:120px;"></div>
         <div></div>
       </div>
-      <!-- Third line: page number on the right -->
-      <div style="display:flex; align-items:center; justify-content:flex-end; width:100%; margin-top:6px;">
-        <div class="page-number">&nbsp;</div>
-      </div>
+  <!-- Third line removed: page numbers disabled in global print footer -->
     </div>
   `;
 
