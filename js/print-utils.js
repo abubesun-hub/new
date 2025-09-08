@@ -90,6 +90,9 @@ function buildPrintFooterHTML() {
     <style>
   /* Ensure page content leaves space for footer and show a separator line */
   body { padding-bottom: 140px; }
+  /* Page number badge (re-added to restore original behavior) */
+  .print-footer .page-number { display:inline-block; padding:6px 10px; border-radius:8px; background:#f3f4f6; color:#374151; font-weight:700; }
+  .print-footer .page-number:after { content: counter(page); }
   /* Footer visual container */
   .print-footer { position:fixed; left:0; right:0; bottom:0; background:rgba(255,255,255,0.98); padding:10px 14px; font-size:12px; color:#333; z-index:4; box-shadow: 0 -2px 8px rgba(0,0,0,0.05); }
   .print-footer .row { display:flex; align-items:center; justify-content:space-between; }
@@ -156,7 +159,7 @@ function buildPrintFooterHTML() {
         <div style="width:120px;"></div>
         <div></div>
       </div>
-  <!-- Third line removed: page numbers disabled in global print footer -->
+  <div style="display:flex; justify-content:center; margin-top:6px;"> <div class="page-number" aria-hidden="true">&nbsp;</div> </div>
     </div>
   `;
 

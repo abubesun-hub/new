@@ -1213,7 +1213,7 @@ class ExpensesManager {
         const receiptBody = this.generateExpenseReceiptHTML(this.lastSavedEntry);
         const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('سند صرف') : '';
 
-        const fullHTML = `
+                const fullHTML = `
             <!DOCTYPE html>
             <html lang="ar" dir="rtl">
             <head>
@@ -1221,6 +1221,30 @@ class ExpensesManager {
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>إيصال مصروف - ${this.lastSavedEntry.registrationNumber}</title>
                 <link rel="stylesheet" href="css/style.css">
+                                <style>
+                                    @page { size: A4; margin: 8mm; }
+                                    @media print {
+                                        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; font-size: 12px; }
+                                    }
+                                    .receipt-container { max-width: 700px !important; padding: 12px !important; border-width: 1px !important; margin: 0 auto !important; }
+                                    .header { margin-bottom: 8px !important; padding-bottom: 8px !important; }
+                                    .company-name, .receipt-title { display: none !important; }
+                                    .receipt-body { margin: 12px 0 !important; }
+                                    .info-row { margin-bottom: 6px !important; padding: 6px !important; }
+                                    .info-label { min-width: 120px !important; font-size: 12px !important; }
+                                    .info-value { font-size: 12px !important; }
+                                    .amount-section { padding: 8px !important; margin: 10px 0 !important; }
+                                    .amount-label { font-size: 14px !important; }
+                                    .amount-value { font-size: 20px !important; }
+                                    .amount-words { font-size: 12px !important; }
+                                    .description-section { padding: 8px !important; margin: 10px 0 !important; }
+                                    .signatures { margin-top: 20px !important; }
+                                    .signature-line { height: 28px !important; }
+                                    .print-info { display: none !important; }
+                                    .print-header .print-sub { font-size: 10px !important; margin-bottom: 4px !important; }
+                                    .print-header .program-name { font-size: 14px !important; }
+                                    .print-footer { padding: 6px 10px !important; font-size: 11px !important; }
+                                </style>
             </head>
             <body>
                 ${header}
@@ -1240,6 +1264,78 @@ class ExpensesManager {
                 try { printWindow.print(); } catch (e) { console.error('Print failed', e); }
             }, 300);
         };
+    }
+
+    // Print a specific expense by id or fallback to registrationNumber
+    printExpenseById(id, registrationNumberFallback = '') {
+        try {
+            const all = StorageManager.getAllData();
+            const list = Array.isArray(all.expenses) ? all.expenses : [];
+            let entry = null;
+            if (id) {
+                entry = list.find(e => e.id === id);
+            }
+            if (!entry && registrationNumberFallback) {
+                entry = list.find(e => e.registrationNumber === registrationNumberFallback);
+            }
+            if (!entry) {
+                this.showNotification('لم يتم العثور على القيد للطباعة', 'error');
+                return;
+            }
+
+            const bodyHtml = this.generateExpenseReceiptHTML(entry);
+            const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('سند صرف') : '';
+            const footer = (typeof buildPrintFooterHTML === 'function') ? buildPrintFooterHTML() : '';
+
+                        const html = `
+                <!DOCTYPE html>
+                <html lang="ar" dir="rtl">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>طباعة قيد - ${entry.registrationNumber || ''}</title>
+                    <link rel="stylesheet" href="css/style.css">
+                                        <style>
+                                            @page { size: A4; margin: 8mm; }
+                                            @media print {
+                                                body { -webkit-print-color-adjust: exact; print-color-adjust: exact; font-size: 12px; }
+                                            }
+                                            .receipt-container { max-width: 700px !important; padding: 12px !important; border-width: 1px !important; margin: 0 auto !important; }
+                                            .header { margin-bottom: 8px !important; padding-bottom: 8px !important; }
+                                            .company-name, .receipt-title { display: none !important; }
+                                            .receipt-body { margin: 12px 0 !important; }
+                                            .info-row { margin-bottom: 6px !important; padding: 6px !important; }
+                                            .info-label { min-width: 120px !important; font-size: 12px !important; }
+                                            .info-value { font-size: 12px !important; }
+                                            .amount-section { padding: 8px !important; margin: 10px 0 !important; }
+                                            .amount-label { font-size: 14px !important; }
+                                            .amount-value { font-size: 20px !important; }
+                                            .amount-words { font-size: 12px !important; }
+                                            .description-section { padding: 8px !important; margin: 10px 0 !important; }
+                                            .signatures { margin-top: 20px !important; }
+                                            .signature-line { height: 28px !important; }
+                                            .print-info { display: none !important; }
+                                            .print-header .print-sub { font-size: 10px !important; margin-bottom: 4px !important; }
+                                            .print-header .program-name { font-size: 14px !important; }
+                                            .print-footer { padding: 6px 10px !important; font-size: 11px !important; }
+                                        </style>
+                </head>
+                <body>
+                    ${header}
+                    <div class="receipt-body">${bodyHtml}</div>
+                    ${footer}
+                </body>
+                </html>
+            `;
+
+            const win = window.open('', '_blank', 'width=900,height=700');
+            win.document.write(html);
+            win.document.close();
+            win.onload = () => setTimeout(() => { try { win.print(); } catch(_){} }, 300);
+        } catch (err) {
+            console.error('printExpenseById error', err);
+            this.showNotification('حدث خطأ أثناء الطباعة', 'error');
+        }
     }
 
     // Generate expense receipt HTML
@@ -1410,8 +1506,6 @@ class ExpensesManager {
             <div class="receipt-container">
                 <!-- Header -->
                 <div class="header">
-                    <div class="company-name">شركة المقاولات المتقدمة</div>
-                    <div class="receipt-title">إيصال مصروف</div>
                     <div class="receipt-number">رقم الإيصال: ${entry.registrationNumber}</div>
                 </div>
 
@@ -2337,7 +2431,7 @@ class ExpensesManager {
                                             <button class="btn btn-outline-info" title="عرض تفاصيل أكثر">
                                                 <i class="bi bi-eye"></i>
                                             </button>
-                                            <button class="btn btn-outline-success" title="طباعة هذا القيد">
+                                            <button class="btn btn-outline-success" title="طباعة هذا القيد" onclick="expensesManager.printExpenseById('${expense.id || ''}', '${expense.registrationNumber || ''}')">
                                                 <i class="bi bi-printer"></i>
                                             </button>
                                         </div>
