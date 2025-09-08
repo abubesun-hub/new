@@ -1,4 +1,39 @@
 // Simple settings UI for print header customization
+// Apply branding texts (only data, no style changes) to visible UI from saved settings
+function applyBrandingFromSettings() {
+  try {
+    const settings = (typeof StorageManager !== 'undefined')
+      ? (StorageManager.getData(StorageManager.STORAGE_KEYS.SETTINGS) || {})
+      : {};
+    const programName = settings.programName || 'نظام المحاسبة';
+    const companyName = settings.companyName || 'شركة المقاولات المتقدمة';
+    const companySubtitle = settings.companySubtitle || 'للشركات المقاولة';
+
+    // Header (dashboard) block
+    const headerTitleEl = document.querySelector('.dashboard-title');
+    if (headerTitleEl) headerTitleEl.textContent = programName;
+
+  const headerProgramLineEl = document.querySelector('header .program-name');
+    if (headerProgramLineEl) headerProgramLineEl.textContent = companySubtitle;
+
+    const headerCompanyEl = document.querySelector('header .company-name');
+    if (headerCompanyEl) headerCompanyEl.textContent = companyName;
+
+    // Login page block
+    const loginTitleEl = document.querySelector('.login-title');
+    if (loginTitleEl) loginTitleEl.textContent = programName;
+
+    const loginSubtitleEl = document.querySelector('.login-subtitle');
+    if (loginSubtitleEl) loginSubtitleEl.textContent = companySubtitle;
+
+    const loginCompanyEl = document.querySelector('#loginPage .company-name');
+    if (loginCompanyEl) loginCompanyEl.textContent = companyName;
+  } catch (e) {
+    // swallow errors to avoid impacting UX if elements/StorageManager not ready
+    console.warn('applyBrandingFromSettings skipped:', e);
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // Create modal HTML
     const modalHtml = `
@@ -249,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.innerHTML = '<i class="bi bi-gear me-1"></i>إعدادات';
         headerActions.prepend(btn);
 
-        btn.addEventListener('click', () => {
+  btn.addEventListener('click', () => {
             const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
             // Load current settings
             const settings = StorageManager.getData(StorageManager.STORAGE_KEYS.SETTINGS) || {};
@@ -394,10 +429,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (saved) {
       // Apply font globally (CSS variable) so app uses it immediately
       document.documentElement.style.setProperty('--app-font', settings.appFont || 'Cairo');
+      // Update on-screen branding texts (no style changes)
+      applyBrandingFromSettings();
             alert('تم حفظ الإعدادات');
             bootstrap.Modal.getInstance(document.getElementById('settingsModal')).hide();
         } else {
             alert('فشل حفظ الإعدادات');
         }
     });
+    // Initial apply on load
+    applyBrandingFromSettings();
 });
