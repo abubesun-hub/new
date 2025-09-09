@@ -2,20 +2,37 @@
 class DashboardManager {
     constructor() {
         this.charts = {};
-        this.refreshInterval = 30000; // 30 seconds
+        this.refreshInterval = 10000; // was 30000 (30s) الآن 10 ثواني كتحديث دوري احتياطي
+        this.refreshDebounceMs = 300; // منع التحديثات المتتالية السريعة
+        this._pendingRefresh = null;
+    this._countdownTimer = null;
+    this._nextRefreshAt = null;
         this.init();
     }
 
     init() {
         this.setupAutoRefresh();
         this.loadDashboardData();
+        // استمع لأي تغيّر في البيانات لتحديث فوري
+        document.addEventListener('dataChanged', (e) => {
+            // دمج عدة تحديثات متقاربة
+            if (this._pendingRefresh) clearTimeout(this._pendingRefresh);
+            this._pendingRefresh = setTimeout(() => {
+                this.loadDashboardData();
+                this._pendingRefresh = null;
+            }, this.refreshDebounceMs);
+        });
     }
 
     // Load all dashboard data
     loadDashboardData() {
+    this.showLoadingIndicator(true);
         this.updateStatistics();
         this.loadRecentTransactions();
         this.updateCharts();
+    // بعد اكتمال التحديث (متزامن حالياً)
+    this.showLoadingIndicator(false);
+    this.restartCountdown();
     }
 
     // Update statistics cards
@@ -325,9 +342,53 @@ class DashboardManager {
 
     // Setup auto-refresh
     setupAutoRefresh() {
+        // مؤقّت احتياطي في حال حدوث تغييرات خارجية لم تلتقط بالحدث (أو فتح التبويب قبل الحدث)
         setInterval(() => {
             this.loadDashboardData();
         }, this.refreshInterval);
+    }
+
+    // ------- Refresh Indicator Logic -------
+    restartCountdown() {
+        if (!this.refreshInterval) return; // لو تم تعطيله
+        this._nextRefreshAt = Date.now() + this.refreshInterval;
+        if (this._countdownTimer) clearInterval(this._countdownTimer);
+        this.updateIndicatorProgress();
+        this._countdownTimer = setInterval(() => {
+            const remaining = this._nextRefreshAt - Date.now();
+            if (remaining <= 0) {
+                clearInterval(this._countdownTimer);
+                this._countdownTimer = null;
+                this.loadDashboardData();
+            } else {
+                this.updateIndicatorProgress(remaining);
+            }
+        }, 250);
+    }
+
+    updateIndicatorProgress(remainingMs) {
+        const el = document.getElementById('dashboardRefreshIndicator');
+        if (!el) return;
+        const barFill = el.querySelector('.bar-fill');
+        const timeSpan = el.querySelector('.time');
+        if (remainingMs == null) remainingMs = this._nextRefreshAt ? (this._nextRefreshAt - Date.now()) : this.refreshInterval;
+        const total = this.refreshInterval || 1;
+        const clamped = Math.max(0, Math.min(total, remainingMs));
+        const pct = 100 - ((clamped / total) * 100); // يمتلئ مع مرور الوقت
+        if (barFill) barFill.style.width = pct.toFixed(1) + '%';
+        if (timeSpan) timeSpan.textContent = Math.ceil(clamped / 1000) + 's';
+        el.classList.toggle('idle', !el.classList.contains('loading'));
+    }
+
+    showLoadingIndicator(isLoading) {
+        const el = document.getElementById('dashboardRefreshIndicator');
+        if (!el) return;
+        el.classList.toggle('loading', isLoading);
+        if (isLoading) {
+            el.title = 'جاري التحديث...';
+        } else {
+            el.title = 'العدّ التنازلي للتحديث القادم';
+        }
     }
 
     // Utility functions

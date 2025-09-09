@@ -89,6 +89,48 @@ body {
     overflow-x: hidden;
 }
 
+/* Refresh Indicator */
+.refresh-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: var(--bg-primary);
+    padding: 6px 10px;
+    border-radius: 14px;
+    box-shadow: var(--neumorphic-shadow-sm);
+    position: relative;
+    min-width: 140px;
+    font-size: 0.75rem;
+}
+.refresh-indicator .spinner {
+    width: 16px;
+    height: 16px;
+    border: 3px solid #ccc;
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+.refresh-indicator.loading .spinner { visibility: visible; }
+.refresh-indicator.idle .spinner { opacity: 0.3; }
+.refresh-indicator .bar {
+    flex: 1;
+    height: 6px;
+    background: #e0e6ee;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+}
+.refresh-indicator .bar-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+    transition: width 0.25s linear;
+}
+.refresh-indicator .time { min-width: 34px; text-align: center; font-weight: 600; color: var(--text-secondary); }
+.refresh-indicator.loading .time { color: var(--primary-color); }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* Neumorphic Components */
 .neumorphic-card {
     background: var(--bg-primary);

@@ -237,7 +237,11 @@ class StorageManager {
         };
         
         capital.push(newEntry);
-        return this.saveData(this.STORAGE_KEYS.CAPITAL, capital) ? newEntry : null;
+        if (this.saveData(this.STORAGE_KEYS.CAPITAL, capital)) {
+            this.notifyDataChanged('capital:add');
+            return newEntry;
+        }
+        return null;
     }
 
     // Update capital entry
@@ -247,7 +251,9 @@ class StorageManager {
         
         if (index !== -1) {
             capital[index] = { ...capital[index], ...updateData, updatedAt: new Date().toISOString() };
-            return this.saveData(this.STORAGE_KEYS.CAPITAL, capital);
+            const ok = this.saveData(this.STORAGE_KEYS.CAPITAL, capital);
+            if (ok) this.notifyDataChanged('capital:update');
+            return ok;
         }
         return false;
     }
@@ -256,7 +262,9 @@ class StorageManager {
     static deleteCapitalEntry(id) {
         const capital = this.getData(this.STORAGE_KEYS.CAPITAL) || [];
         const filteredCapital = capital.filter(c => c.id !== id);
-        return this.saveData(this.STORAGE_KEYS.CAPITAL, filteredCapital);
+    const ok = this.saveData(this.STORAGE_KEYS.CAPITAL, filteredCapital);
+    if (ok) this.notifyDataChanged('capital:delete');
+    return ok;
     }
 
     // Add expense entry
@@ -270,7 +278,11 @@ class StorageManager {
         };
         
         expenses.push(newEntry);
-        return this.saveData(this.STORAGE_KEYS.EXPENSES, expenses) ? newEntry : null;
+        if (this.saveData(this.STORAGE_KEYS.EXPENSES, expenses)) {
+            this.notifyDataChanged('expenses:add');
+            return newEntry;
+        }
+        return null;
     }
 
     // Update expense entry
@@ -280,7 +292,9 @@ class StorageManager {
         
         if (index !== -1) {
             expenses[index] = { ...expenses[index], ...updateData, updatedAt: new Date().toISOString() };
-            return this.saveData(this.STORAGE_KEYS.EXPENSES, expenses);
+            const ok = this.saveData(this.STORAGE_KEYS.EXPENSES, expenses);
+            if (ok) this.notifyDataChanged('expenses:update');
+            return ok;
         }
         return false;
     }
@@ -289,7 +303,9 @@ class StorageManager {
     static deleteExpenseEntry(id) {
         const expenses = this.getData(this.STORAGE_KEYS.EXPENSES) || [];
         const filteredExpenses = expenses.filter(e => e.id !== id);
-        return this.saveData(this.STORAGE_KEYS.EXPENSES, filteredExpenses);
+    const ok = this.saveData(this.STORAGE_KEYS.EXPENSES, filteredExpenses);
+    if (ok) this.notifyDataChanged('expenses:delete');
+    return ok;
     }
 
     // Accounting Guide Management
@@ -541,9 +557,21 @@ class StorageManager {
                 localStorage.removeItem(key);
             });
             this.initializeDefaultData();
+            this.notifyDataChanged('data:cleared');
             return true;
         }
         return false;
+    }
+
+    // Notify listeners that financial data changed
+    static notifyDataChanged(action) {
+        // تجنّب الإطلاق أثناء التحميل الأولي (اختياري) يمكن التوسّع لاحقاً
+        try {
+            const event = new CustomEvent('dataChanged', { detail: { action, at: Date.now() } });
+            document.dispatchEvent(event);
+        } catch (e) {
+            console.warn('notifyDataChanged failed', e);
+        }
     }
 
     // Get storage usage
