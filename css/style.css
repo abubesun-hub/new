@@ -129,6 +129,17 @@ body {
 .refresh-indicator .time { min-width: 34px; text-align: center; font-weight: 600; color: var(--text-secondary); }
 .refresh-indicator.loading .time { color: var(--primary-color); }
 
+/* حالة الاكتمال (نمط المرة الواحدة) */
+.refresh-indicator.complete {
+    box-shadow: 0 0 0 2px #4caf5030, var(--neumorphic-shadow-sm);
+}
+.refresh-indicator.complete .bar-fill {
+    background: linear-gradient(90deg,#4caf50,#2e7d32);
+    width: 100% !important;
+}
+.refresh-indicator.complete .spinner { display: none; }
+.refresh-indicator.complete .time { color:#2e7d32; }
+
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* Neumorphic Components */

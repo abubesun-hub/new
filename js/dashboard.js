@@ -7,12 +7,22 @@ class DashboardManager {
         this._pendingRefresh = null;
     this._countdownTimer = null;
     this._nextRefreshAt = null;
+        // نمط تشغيل العدّ مرة واحدة فقط بعد الدخول / التحديث
+        this.oneShotMode = true;
+        this._initialCountdownDone = false;
         this.init();
     }
 
     init() {
-        this.setupAutoRefresh();
-        this.loadDashboardData();
+        // في نمط المرة الواحدة لا نفعّل مؤقّت متكرر
+        if (!this.oneShotMode) {
+            this.setupAutoRefresh();
+        }
+        this.loadDashboardData(); // تحميل أولي
+        // ابدأ العدّ التنازلي مرة واحدة فقط
+        if (this.oneShotMode) {
+            this.restartCountdown();
+        }
         // استمع لأي تغيّر في البيانات لتحديث فوري
         document.addEventListener('dataChanged', (e) => {
             // دمج عدة تحديثات متقاربة
@@ -32,7 +42,10 @@ class DashboardManager {
         this.updateCharts();
     // بعد اكتمال التحديث (متزامن حالياً)
     this.showLoadingIndicator(false);
-    this.restartCountdown();
+        // لا نعيد تشغيل العدّ في نمط المرة الواحدة أو بعد انتهاء العدّ الأول
+        if (!this.oneShotMode && !this._initialCountdownDone) {
+            this.restartCountdown();
+        }
     }
 
     // Update statistics cards
@@ -351,6 +364,7 @@ class DashboardManager {
     // ------- Refresh Indicator Logic -------
     restartCountdown() {
         if (!this.refreshInterval) return; // لو تم تعطيله
+        if (this.oneShotMode && this._initialCountdownDone) return; // لا نعيد العدّ
         this._nextRefreshAt = Date.now() + this.refreshInterval;
         if (this._countdownTimer) clearInterval(this._countdownTimer);
         this.updateIndicatorProgress();
@@ -359,7 +373,12 @@ class DashboardManager {
             if (remaining <= 0) {
                 clearInterval(this._countdownTimer);
                 this._countdownTimer = null;
-                this.loadDashboardData();
+                // عند اكتمال العد الأول: تحديث آخر (لتأكيد الأرقام) ثم وضع المؤشر على حالة مكتمل وعدم تكرار
+                if (!this._initialCountdownDone) {
+                    this._initialCountdownDone = true;
+                    this.loadDashboardData();
+                    this.markCountdownComplete();
+                }
             } else {
                 this.updateIndicatorProgress(remaining);
             }
@@ -387,8 +406,25 @@ class DashboardManager {
         if (isLoading) {
             el.title = 'جاري التحديث...';
         } else {
-            el.title = 'العدّ التنازلي للتحديث القادم';
+            el.title = this.oneShotMode ? 'تم التحميل الأول. استخدم زر التحديث اليدوي عند الحاجة.' : 'العدّ التنازلي للتحديث القادم';
         }
+    }
+
+    markCountdownComplete() {
+        const el = document.getElementById('dashboardRefreshIndicator');
+        if (!el) return;
+        el.classList.add('complete');
+        el.classList.remove('loading');
+        const barFill = el.querySelector('.bar-fill');
+        const timeSpan = el.querySelector('.time');
+        if (barFill) barFill.style.width = '100%';
+        if (timeSpan) timeSpan.textContent = 'تم';
+        el.title = 'انتهى العدّ الأول - لن يُعاد تلقائياً';
+    }
+
+    manualRefresh() {
+        // تحديث فوري عند الضغط (لا يعيد العدّ في oneShotMode)
+        this.loadDashboardData();
     }
 
     // Utility functions
