@@ -192,6 +192,9 @@ class AccountingApp {
             case 'users':
                 this.loadUsersSection();
                 break;
+            case 'form':
+                this.loadFormSection();
+                break;
         }
     }
 
@@ -328,6 +331,19 @@ class AccountingApp {
 
         usersSection.innerHTML = usersHTML;
         this.showUsersList();
+    }
+
+    loadFormSection() {
+        // Ensure FormManager exists then load section
+        if (!window.formManager) {
+            try {
+                window.formManager = new FormManager();
+            } catch (error) {
+                console.error('Error creating FormManager:', error);
+                return;
+            }
+        }
+        window.formManager.loadFormSection();
     }
 
     loadQuickReports() {
