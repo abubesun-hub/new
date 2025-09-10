@@ -7,6 +7,7 @@ class ExpensesManager {
         this.editingGuideId = null;
     // اختيار نوع قيد الشراء بالآجل (purchase_receipt | measurement)
     this.creditPurchaseType = null;
+    this.creditPurchaseSubView = null; // (suppliers | add | settlements)
         this.init();
     }
 
@@ -111,110 +112,152 @@ class ExpensesManager {
                 this.loadAccountingGuideView();
                 break;
             case 'credit-purchase':
-                this.loadCreditPurchaseView();
+                this.loadCreditPurchaseView('menu');
                 break;
         }
     }
 
     // View: Credit Purchase (Deferred Purchase)
-    loadCreditPurchaseView() {
-        // إعادة تعيين النوع عند كل فتح
-        this.creditPurchaseType = null;
-    const html = `
-            <div class="neumorphic-card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h4 class="mb-0"><i class="bi bi-cart-check me-2"></i>الشراء بالآجل</h4>
-                    <span class="badge bg-warning text-dark">تجريبي</span>
-                </div>
-                <div class="card-body">
-                    <p class="text-muted mb-2">هذه واجهة مبدئية لتسجيل عمليات الشراء بالآجل. اختر أولاً <strong>نوع القيد</strong> ثم أدخل البيانات.</p>
-                    <div class="mb-3" id="cpTypeSelector">
-                        <label class="form-label"><i class="bi bi-ui-checks me-1"></i>نوع قيد الشراء بالآجل</label>
-                        <div class="d-flex gap-2 flex-wrap">
-                            <button type="button" class="btn btn-outline-primary cp-type-btn" onclick="expensesManager.selectCreditPurchaseType('purchase_receipt')"><i class="bi bi-receipt"></i> وصل شراء</button>
-                            <button type="button" class="btn btn-outline-primary cp-type-btn" onclick="expensesManager.selectCreditPurchaseType('measurement')"><i class="bi bi-rulers"></i> ذرعة محتسبة</button>
-                            <span id="cpTypeSelectedBadge" class="badge bg-secondary align-self-center" style="display:none"></span>
-                        </div>
-                    </div>
-                    <form id="creditPurchaseForm" class="row g-3">
-                        <div class="col-md-3">
-                            <label class="form-label"><i class="bi bi-hash me-1"></i>رقم القيد</label>
-                            <input type="text" class="form-control neumorphic-input" id="cpRegistrationNumber" value="CP-${Date.now().toString().slice(-6)}" readonly>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label"><i class="bi bi-calendar me-1"></i>تاريخ الشراء</label>
-                            <input type="date" class="form-control neumorphic-input" id="cpDate" value="${new Date().toISOString().split('T')[0]}" required>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label"><i class="bi bi-building me-1"></i>المورد</label>
-                            <input type="text" class="form-control neumorphic-input" id="cpVendor" placeholder="اسم المورد" required>
-                        </div>
-                        <div class="col-md-3" id="cpPurchaseReceiptNumberWrapper" style="display:none;">
-                            <label class="form-label"><i class="bi bi-receipt me-1"></i>رقم وصل الشراء</label>
-                            <input type="text" class="form-control neumorphic-input" id="cpPurchaseReceiptNumber" placeholder="رقم الوصل" disabled>
-                        </div>
-                        <div class="col-md-8">
-                            <label class="form-label" id="cpDescriptionLabel"><i class="bi bi-file-text me-1"></i>الوصف</label>
-                            <input type="text" class="form-control neumorphic-input" id="cpDescription" placeholder="اختر نوع القيد أولاً" required disabled>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label"><i class="bi bi-calendar-event me-1"></i>تاريخ الاستحقاق</label>
-                            <input type="date" class="form-control neumorphic-input" id="cpDueDate" disabled>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label"><i class="bi bi-currency-dollar me-1"></i>المبلغ بالدولار</label>
-                            <input type="number" class="form-control neumorphic-input" id="cpAmountUSD" step="0.01" min="0" placeholder="0.00" disabled>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label"><i class="bi bi-cash me-1"></i>المبلغ بالدينار</label>
-                            <input type="number" class="form-control neumorphic-input" id="cpAmountIQD" step="1" min="0" placeholder="0" disabled>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label"><i class="bi bi-arrow-left-right me-1"></i>سعر الصرف</label>
-                            <input type="number" class="form-control neumorphic-input" id="cpExchangeRate" value="1500" step="0.01" min="0" disabled>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label"><i class="bi bi-flag me-1"></i>الحالة</label>
-                            <select id="cpStatus" class="form-control neumorphic-input" disabled>
-                                <option value="open">مفتوح</option>
-                                <option value="partial">مسدد جزئياً</option>
-                                <option value="closed">مغلق</option>
-                            </select>
-                        </div>
-                        <div class="col-md-12">
-                            <label class="form-label"><i class="bi bi-chat-text me-1"></i>ملاحظات</label>
-                            <textarea id="cpNotes" class="form-control neumorphic-input" rows="2" placeholder="تفاصيل إضافية..." disabled></textarea>
-                        </div>
-                        <div class="col-12 d-flex gap-2 flex-wrap">
-                            <button type="submit" class="btn btn-primary neumorphic-btn" id="cpSubmitBtn" disabled><i class="bi bi-save me-1"></i>حفظ</button>
-                            <button type="reset" class="btn btn-secondary neumorphic-btn" id="cpResetBtn" disabled><i class="bi bi-arrow-counterclockwise me-1"></i>تفريغ</button>
-                            <button type="button" class="btn btn-info neumorphic-btn" id="cpPreviewBtn" disabled onclick="expensesManager.previewCreditPurchase()"><i class="bi bi-eye me-1"></i>معاينة</button>
-                            <button type="button" class="btn btn-warning neumorphic-btn" id="cpPrintBtn" disabled onclick="expensesManager.printCreditPurchaseInvoice()"><i class="bi bi-printer me-1"></i>طباعة فوترة</button>
-                        </div>
-                    </form>
-                    <div id="creditPurchasePreview" class="mt-4" style="display:none;">
-                        <div class="border rounded p-3 bg-light">
-                            <h5 class="mb-3"><i class="bi bi-eye me-1"></i>معاينة الشراء بالآجل</h5>
-                            <div id="creditPurchasePreviewContent"></div>
-                        </div>
-                    </div>
-                </div>
+    loadCreditPurchaseView(subView) {
+        // تحديد المشهد الفرعي
+        this.creditPurchaseSubView = subView || this.creditPurchaseSubView || 'menu';
+        const container = document.getElementById('expensesContent');
+        if(!container) return;
+
+        if(this.creditPurchaseSubView === 'menu') {
+            container.innerHTML = this.renderCreditPurchaseMenu();
+            return; // لا شيء آخر
+        }
+
+        // محتوى فرعي + شريط تنقل علوي
+        let innerHTML = this.renderCreditPurchaseNavBar();
+        switch(this.creditPurchaseSubView){
+            case 'suppliers':
+                innerHTML += this.renderCreditPurchaseSuppliersSection();
+                break;
+            case 'add':
+                this.creditPurchaseType = null; // reset type when entering add screen
+                innerHTML += this.renderCreditPurchaseAddSection();
+                break;
+            case 'settlements':
+            default:
+                innerHTML += this.renderCreditPurchaseSettlementSection();
+                break;
+        }
+        container.innerHTML = innerHTML;
+
+        // تهيئة حسب المشهد
+        if(this.creditPurchaseSubView==='suppliers'){
+            this.setupCreditPurchaseSuppliersHandlers();
+            this.refreshCreditPurchaseSuppliersUI();
+        } else if(this.creditPurchaseSubView==='add') {
+            this.setupCreditPurchaseAddFormHandlers();
+            this.refreshCreditPurchaseSuppliersUI(); // لتعبئة القائمة
+            this.renderCreditPurchasesTable();
+        }
+    }
+
+    renderCreditPurchaseMenu(){
+        return `
+            <div class="row g-4">
+                ${['suppliers','add','settlements'].map(key=>{
+                    const meta = {suppliers:{icon:'bi-people',title:'بيانات الموردين',desc:'إدارة وإضافة موردين'},add:{icon:'bi-cart-check',title:'إضافة قيد الشراء بالآجل',desc:'تسجيل فاتورة أو ذرعة'},settlements:{icon:'bi-wallet2',title:'تسديد مبالغ الشراء',desc:'إدارة الدفعات (قريباً)'}}[key];
+                    return `<div class="col-md-4"><div class="credit-menu-card" onclick=\"expensesManager.loadCreditPurchaseView('${key}')\"><div class='icon-wrap'><i class="bi ${meta.icon}"></i></div><h5>${meta.title}</h5><p>${meta.desc}</p></div></div>`;
+                }).join('')}
             </div>
-            <div class="neumorphic-card mt-4">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-journal-text me-2"></i>سجل الشراء بالآجل</h5>
-                    <button class="btn btn-sm btn-outline-success" onclick="expensesManager.exportCreditPurchases()"><i class="bi bi-file-earmark-excel me-1"></i>تصدير</button>
-                </div>
-                <div class="card-body">
-                    <div id="creditPurchasesList" class="table-responsive"></div>
-                </div>
-            </div>`;
+            <style>
+            .credit-menu-card{cursor:pointer;background:#f7f9fc;border-radius:18px;padding:32px 24px;box-shadow:7px 7px 14px #d5dae0,-7px -7px 14px #ffffff;transition:.25s; text-align:center; position:relative;}
+            .credit-menu-card:hover{transform:translateY(-4px);box-shadow:6px 6px 12px #cfd4da,-6px -6px 12px #ffffff;}
+            .credit-menu-card h5{margin-top:12px;font-weight:600;font-size:1.05rem;}
+            .credit-menu-card p{margin:6px 0 0;font-size:.8rem;color:#666;}
+            .credit-menu-card .icon-wrap{width:54px;height:54px;margin:0 auto;background:linear-gradient(120deg,#5b74ff,#7956de);display:flex;align-items:center;justify-content:center;border-radius:16px;color:#fff;font-size:28px;}
+            </style>`;
+    }
 
-        document.getElementById('expensesContent').innerHTML = html;
+    renderCreditPurchaseNavBar(){
+        const tabs = [
+            {key:'suppliers',label:'بيانات الموردين',icon:'bi-people'},
+            {key:'add',label:'إضافة قيد الشراء بالآجل',icon:'bi-cart-check'},
+            {key:'settlements',label:'تسديد مبالغ الشراء',icon:'bi-wallet2'}
+        ];
+        return `<div class='cp-subnav mb-4 d-flex gap-3 flex-wrap'>${tabs.map(t=>`<div class="cp-subnav-item ${this.creditPurchaseSubView===t.key?'active':''}" onclick=\"expensesManager.loadCreditPurchaseView('${t.key}')\"><i class='bi ${t.icon}'></i><span>${t.label}</span></div>`).join('')}</div>
+        <style>
+        .cp-subnav-item{cursor:pointer;display:flex;align-items:center;gap:8px;padding:14px 34px;background:#f5f7fa;border-radius:14px;font-size:.9rem;font-weight:500;color:#203040;box-shadow:6px 6px 12px #d5dae0,-6px -6px 12px #ffffff;transition:.25s;}
+        .cp-subnav-item.active{background:linear-gradient(120deg,#5b74ff,#7956de);color:#fff;box-shadow:inset 4px 4px 8px rgba(0,0,0,.15),inset -4px -4px 8px rgba(255,255,255,.2);} 
+        .cp-subnav-item:not(.active):hover{transform:translateY(-3px);} 
+        .cp-subnav-item i{font-size:1.1rem;} 
+        </style>`;
+    }
 
-        // Form handler
+    renderCreditPurchaseSuppliersSection(){
+        return `<div class="neumorphic-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-people me-2"></i>موردو الشراء بالآجل</h5>
+                <button class="btn btn-sm btn-outline-primary" type="button" onclick="expensesManager.toggleAddSupplierForm()" id="toggleSupplierFormBtn">إضافة مورد</button>
+            </div>
+            <div class="card-body">
+                <div id="addSupplierFormWrapper" style="display:none;" class="mb-3">
+                    <form id="cpSupplierForm" class="row g-2">
+                        <div class="col-md-3"><label class="form-label">اسم المورد</label><input type="text" class="form-control" id="cpSupplierName" required placeholder="مثال: شركة البناء" /></div>
+                        <div class="col-md-2"><label class="form-label">النوع</label><input type="text" class="form-control" id="cpSupplierType" placeholder="مواد، خدمات.." /></div>
+                        <div class="col-md-2"><label class="form-label">الهاتف</label><input type="text" class="form-control" id="cpSupplierPhone" placeholder="07..." /></div>
+                        <div class="col-md-4"><label class="form-label">العنوان</label><input type="text" class="form-control" id="cpSupplierAddress" placeholder="المدينة / الشارع" /></div>
+                        <div class="col-md-1 d-flex align-items-end"><button class="btn btn-success w-100" type="submit"><i class="bi bi-plus-circle"></i></button></div>
+                    </form>
+                    <div class="small text-muted mt-1">أدخل اسم المورد واضغط حفظ للإضافة. سيتم تحديث قائمة الموردين.</div>
+                </div>
+                <div id="cpSuppliersTableWrapper" class="table-responsive"></div>
+            </div>
+        </div>`;
+    }
+
+    renderCreditPurchaseAddSection(){
+        const suppliers = this.getCreditPurchaseSuppliers();
+        return `<div class="neumorphic-card">
+            <div class="card-header d-flex justify-content-between align-items-center"><h4 class="mb-0"><i class="bi bi-cart-check me-2"></i>إضافة قيد شراء بالآجل</h4><span class="badge bg-warning text-dark">تجريبي</span></div>
+            <div class="card-body">
+            <p class="text-muted mb-2">اختر <strong>نوع القيد</strong> أولاً ثم أكمل البيانات.</p>
+            <div class="mb-3" id="cpTypeSelector"><label class="form-label"><i class="bi bi-ui-checks me-1"></i>نوع قيد الشراء بالآجل</label><div class="d-flex gap-2 flex-wrap"><button type="button" class="btn btn-outline-primary cp-type-btn" onclick="expensesManager.selectCreditPurchaseType('purchase_receipt')"><i class="bi bi-receipt"></i> وصل شراء</button><button type="button" class="btn btn-outline-primary cp-type-btn" onclick="expensesManager.selectCreditPurchaseType('measurement')"><i class="bi bi-rulers"></i> ذرعة محتسبة</button><span id="cpTypeSelectedBadge" class="badge bg-secondary align-self-center" style="display:none"></span></div></div>
+            <form id="creditPurchaseForm" class="row g-3">
+                <div class="col-md-3"><label class="form-label"><i class="bi bi-hash me-1"></i>رقم القيد</label><input type="text" class="form-control neumorphic-input" id="cpRegistrationNumber" value="CP-${Date.now().toString().slice(-6)}" readonly></div>
+                <div class="col-md-3"><label class="form-label"><i class="bi bi-calendar me-1"></i>تاريخ الشراء</label><input type="date" class="form-control neumorphic-input" id="cpDate" value="${new Date().toISOString().split('T')[0]}" required></div>
+                <div class="col-md-6"><label class="form-label"><i class="bi bi-building me-1"></i>المورد</label><select class="form-control neumorphic-input" id="cpVendorSelect" required disabled><option value="">اختر المورد</option>${suppliers.map(s=>`<option value='${s.id}'>${s.name}</option>`).join('')}</select></div>
+                <div class="col-md-3" id="cpPurchaseReceiptNumberWrapper" style="display:none;"><label class="form-label"><i class="bi bi-receipt me-1"></i>رقم وصل الشراء</label><input type="text" class="form-control neumorphic-input" id="cpPurchaseReceiptNumber" placeholder="رقم الوصل" disabled></div>
+                <div class="col-md-8"><label class="form-label" id="cpDescriptionLabel"><i class="bi bi-file-text me-1"></i>الوصف</label><input type="text" class="form-control neumorphic-input" id="cpDescription" placeholder="اختر نوع القيد أولاً" required disabled></div>
+                <div class="col-md-4"><label class="form-label"><i class="bi bi-calendar-event me-1"></i>تاريخ الاستحقاق</label><input type="date" class="form-control neumorphic-input" id="cpDueDate" disabled></div>
+                <div class="col-md-4"><label class="form-label"><i class="bi bi-currency-dollar me-1"></i>المبلغ بالدولار</label><input type="number" class="form-control neumorphic-input" id="cpAmountUSD" step="0.01" min="0" placeholder="0.00" disabled></div>
+                <div class="col-md-4"><label class="form-label"><i class="bi bi-cash me-1"></i>المبلغ بالدينار</label><input type="number" class="form-control neumorphic-input" id="cpAmountIQD" step="1" min="0" placeholder="0" disabled></div>
+                <div class="col-md-4"><label class="form-label"><i class="bi bi-arrow-left-right me-1"></i>سعر الصرف</label><input type="number" class="form-control neumorphic-input" id="cpExchangeRate" value="1500" step="0.01" min="0" disabled></div>
+                <div class="col-md-4"><label class="form-label"><i class="bi bi-flag me-1"></i>الحالة</label><select id="cpStatus" class="form-control neumorphic-input" disabled><option value="open">مفتوح</option><option value="partial">مسدد جزئياً</option><option value="closed">مغلق</option></select></div>
+                <div class="col-md-12"><label class="form-label"><i class="bi bi-chat-text me-1"></i>ملاحظات</label><textarea id="cpNotes" class="form-control neumorphic-input" rows="2" placeholder="تفاصيل إضافية..." disabled></textarea></div>
+                <div class="col-12 d-flex gap-2 flex-wrap"><button type="submit" class="btn btn-primary neumorphic-btn" id="cpSubmitBtn" disabled><i class="bi bi-save me-1"></i>حفظ</button><button type="reset" class="btn btn-secondary neumorphic-btn" id="cpResetBtn" disabled><i class="bi bi-arrow-counterclockwise me-1"></i>تفريغ</button><button type="button" class="btn btn-info neumorphic-btn" id="cpPreviewBtn" disabled onclick="expensesManager.previewCreditPurchase()"><i class="bi bi-eye me-1"></i>معاينة</button><button type="button" class="btn btn-warning neumorphic-btn" id="cpPrintBtn" disabled onclick="expensesManager.printCreditPurchaseInvoice()"><i class="bi bi-printer me-1"></i>طباعة فوترة</button><button type="button" class="btn btn-outline-success neumorphic-btn" onclick="expensesManager.exportCreditPurchases()"><i class="bi bi-file-earmark-excel me-1"></i>تصدير السجل</button></div>
+            </form>
+            <div id="creditPurchasePreview" class="mt-4" style="display:none;"><div class="border rounded p-3 bg-light"><h5 class="mb-3"><i class="bi bi-eye me-1"></i>معاينة الشراء بالآجل</h5><div id="creditPurchasePreviewContent"></div></div></div>
+            <hr class="my-4"/><h5 class="mb-3"><i class="bi bi-journal-text me-1"></i>سجل القيود</h5><div id="creditPurchasesList" class="table-responsive"></div>
+            </div></div>`;
+    }
+
+    renderCreditPurchaseSettlementSection(){
+        return `<div class="neumorphic-card"><div class="card-header d-flex justify-content-between align-items-center"><h4 class="mb-0"><i class="bi bi-wallet2 me-2"></i>تسديد مبالغ الشراء بالآجل</h4><span class="badge bg-secondary">قيد التطوير</span></div><div class="card-body text-center text-muted"><i class="bi bi-tools display-6 d-block mb-3"></i><p class="mb-1">سيتم لاحقاً إدارة دفعات الموردين لكل قيد (دفعة جزئية / كاملة / رصيد متبق).</p><p class="small">اقترح الحقول المطلوبة: رقم الدفع، تاريخ، مبلغ، عملة، مرجع القيد، ملاحظات.</p></div></div>`;
+    }
+
+    setupCreditPurchaseSuppliersHandlers(){
+        const supplierForm = document.getElementById('cpSupplierForm');
+        if(supplierForm){
+            supplierForm.addEventListener('submit',(ev)=>{
+                ev.preventDefault();
+                const name = document.getElementById('cpSupplierName').value.trim();
+                if(!name){ alert('اسم المورد مطلوب'); return; }
+                const newSupplier = { id: 'SUP-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), name, type: document.getElementById('cpSupplierType').value.trim(), phone: document.getElementById('cpSupplierPhone').value.trim(), address: document.getElementById('cpSupplierAddress').value.trim(), createdAt: new Date().toISOString() };
+                this.addCreditPurchaseSupplier(newSupplier); supplierForm.reset(); this.refreshCreditPurchaseSuppliersUI(); alert('تمت إضافة المورد');
+            });
+        }
+    }
+
+    setupCreditPurchaseAddFormHandlers(){
         const form = document.getElementById('creditPurchaseForm');
-        form.addEventListener('submit', (e) => {
+        if(!form) return;
+        form.addEventListener('submit',(e)=>{
             e.preventDefault();
             if(!this.creditPurchaseType){
                 alert('يرجى اختيار نوع قيد الشراء (وصل شراء أو ذرعة محتسبة)');
@@ -222,13 +265,16 @@ class ExpensesManager {
             }
             const data = StorageManager.getAllData();
             if (!data.creditPurchases) data.creditPurchases = [];
+            const supplierId = document.getElementById('cpVendorSelect')?.value || '';
+            const supplierObj = this.getCreditPurchaseSuppliers().find(s=>s.id===supplierId);
             const entry = {
                 type: 'credit_purchase',
                 creditType: this.creditPurchaseType,
                 purchaseReceiptNumber: this.creditPurchaseType === 'purchase_receipt' ? (document.getElementById('cpPurchaseReceiptNumber').value || '') : '',
                 registrationNumber: document.getElementById('cpRegistrationNumber').value,
                 date: document.getElementById('cpDate').value,
-                vendor: document.getElementById('cpVendor').value.trim(),
+                vendor: supplierObj ? supplierObj.name : '',
+                vendorId: supplierObj ? supplierObj.id : null,
                 description: document.getElementById('cpDescription').value.trim(),
                 dueDate: document.getElementById('cpDueDate').value || null,
                 amountUSD: parseFloat(document.getElementById('cpAmountUSD').value) || 0,
@@ -245,8 +291,6 @@ class ExpensesManager {
             // regenerate number for next entry
             document.getElementById('cpRegistrationNumber').value = 'CP-' + Date.now().toString().slice(-6);
         });
-
-        this.renderCreditPurchasesTable();
     }
 
     // تفعيل الحقول حسب اختيار النوع
@@ -263,6 +307,7 @@ class ExpensesManager {
             const el = document.getElementById(id);
             if(el) el.disabled = false;
         });
+    const vSel = document.getElementById('cpVendorSelect'); if(vSel) vSel.disabled = false;
         ['cpPreviewBtn','cpPrintBtn'].forEach(id=>{const el=document.getElementById(id); if(el) el.disabled=false;});
         // إظهار / إخفاء حقل رقم وصل الشراء
         const receiptWrap = document.getElementById('cpPurchaseReceiptNumberWrapper');
@@ -372,10 +417,12 @@ class ExpensesManager {
     // معاينة عملية الشراء بالآجل
     previewCreditPurchase(){
         if(!this.creditPurchaseType){ alert('اختر نوع القيد أولاً'); return; }
+        const vSel = document.getElementById('cpVendorSelect');
+        const supplierObj = vSel ? this.getCreditPurchaseSuppliers().find(s=>s.id===vSel.value) : null;
         const data = {
             registrationNumber: document.getElementById('cpRegistrationNumber').value,
             type: this.creditPurchaseType === 'measurement' ? 'ذرعة محتسبة' : 'وصل شراء',
-            vendor: document.getElementById('cpVendor').value,
+            vendor: supplierObj ? supplierObj.name : '',
             date: document.getElementById('cpDate').value,
             dueDate: document.getElementById('cpDueDate').value,
             description: document.getElementById('cpDescription').value,
@@ -438,10 +485,12 @@ class ExpensesManager {
     printCreditPurchaseInvoice(){
         // جمع البيانات (لا نعتمد فقط على المعاينة حتى لو لم تُضغط زر معاينة)
         if(!this.creditPurchaseType){ alert('اختر نوع القيد أولاً'); return; }
+        const vSel2 = document.getElementById('cpVendorSelect');
+        const supplierObj2 = vSel2 ? this.getCreditPurchaseSuppliers().find(s=>s.id===vSel2.value) : null;
         const data = {
             registrationNumber: document.getElementById('cpRegistrationNumber').value,
             type: this.creditPurchaseType === 'measurement' ? 'ذرعة محتسبة' : 'وصل شراء',
-            vendor: document.getElementById('cpVendor').value,
+            vendor: supplierObj2 ? supplierObj2.name : '',
             date: document.getElementById('cpDate').value,
             dueDate: document.getElementById('cpDueDate').value,
             description: document.getElementById('cpDescription').value,
@@ -460,6 +509,49 @@ class ExpensesManager {
         win.focus();
         // تأخير بسيط لضمان تحميل الخطوط قبل الطباعة
         setTimeout(()=>win.print(), 150);
+    }
+
+    // ====== إدارة موردين الشراء بالآجل ======
+    getCreditPurchaseSuppliers(){
+        const data = StorageManager.getAllData();
+        if(!data.creditPurchaseSuppliers) data.creditPurchaseSuppliers = [];
+        return data.creditPurchaseSuppliers;
+    }
+    saveCreditPurchaseSuppliers(list){
+        const data = StorageManager.getAllData();
+        data.creditPurchaseSuppliers = list;
+        StorageManager.setAllData(data);
+    }
+    addCreditPurchaseSupplier(supplier){
+        const list = this.getCreditPurchaseSuppliers();
+        list.push(supplier);
+        this.saveCreditPurchaseSuppliers(list);
+        return supplier;
+    }
+    toggleAddSupplierForm(){
+        const wrap = document.getElementById('addSupplierFormWrapper');
+        const btn = document.getElementById('toggleSupplierFormBtn');
+        if(!wrap) return;
+        const shown = wrap.style.display !== 'none';
+        wrap.style.display = shown ? 'none':'block';
+        if(btn) btn.textContent = shown ? 'إضافة مورد' : 'إخفاء النموذج';
+    }
+    refreshCreditPurchaseSuppliersUI(){
+        const tableWrap = document.getElementById('cpSuppliersTableWrapper');
+        const list = this.getCreditPurchaseSuppliers();
+        if(tableWrap){
+            if(list.length===0){
+                tableWrap.innerHTML = '<div class="text-muted small">لا توجد مورّدون مضافون بعد.</div>';
+            } else {
+                tableWrap.innerHTML = `<table class="table table-sm table-striped"><thead><tr><th>الاسم</th><th>النوع</th><th>الهاتف</th><th>العنوان</th></tr></thead><tbody>${list.map(s=>`<tr><td>${s.name}</td><td>${s.type||'-'}</td><td>${s.phone||'-'}</td><td>${s.address||'-'}</td></tr>`).join('')}</tbody></table>`;
+            }
+        }
+        const sel = document.getElementById('cpVendorSelect');
+        if(sel){
+            const current = sel.value;
+            sel.innerHTML = '<option value="">اختر المورد</option>' + list.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+            if(list.some(s=>s.id===current)) sel.value = current;
+        }
     }
 
     // دالة مساعدة: توليد HTML للفوترة بتنسيق احترافي مشابه للصورة
