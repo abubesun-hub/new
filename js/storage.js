@@ -7,7 +7,9 @@ class StorageManager {
         USERS: 'accounting_users',
         SETTINGS: 'accounting_settings',
         BACKUP: 'accounting_backup',
-        ACCOUNTING_GUIDE: 'accounting_guide'
+    ACCOUNTING_GUIDE: 'accounting_guide',
+    CREDIT_PURCHASE_SUPPLIERS: 'credit_purchase_suppliers', // موردو الشراء بالآجل
+    CREDIT_PURCHASES: 'credit_purchases' // قيود الشراء بالآجل
     };
 
     static ENCRYPTION_KEY = 'accounting_system_2024';
@@ -146,6 +148,13 @@ class StorageManager {
             };
             this.saveData(this.STORAGE_KEYS.SETTINGS, defaultSettings);
         }
+        // مفاتيح الشراء بالآجل الجديدة
+        if (!this.getData(this.STORAGE_KEYS.CREDIT_PURCHASE_SUPPLIERS)) {
+            this.saveData(this.STORAGE_KEYS.CREDIT_PURCHASE_SUPPLIERS, []);
+        }
+        if (!this.getData(this.STORAGE_KEYS.CREDIT_PURCHASES)) {
+            this.saveData(this.STORAGE_KEYS.CREDIT_PURCHASES, []);
+        }
     }
 
     // Save data to localStorage (simplified without encryption)
@@ -190,8 +199,26 @@ class StorageManager {
             expenses: this.getData(this.STORAGE_KEYS.EXPENSES) || [],
             users: this.getData(this.STORAGE_KEYS.USERS) || [],
             settings: this.getData(this.STORAGE_KEYS.SETTINGS) || {},
-            accountingGuide: this.getData(this.STORAGE_KEYS.ACCOUNTING_GUIDE) || []
+            accountingGuide: this.getData(this.STORAGE_KEYS.ACCOUNTING_GUIDE) || [],
+            creditPurchaseSuppliers: this.getData(this.STORAGE_KEYS.CREDIT_PURCHASE_SUPPLIERS) || [],
+            creditPurchases: this.getData(this.STORAGE_KEYS.CREDIT_PURCHASES) || []
         };
+    }
+
+    // حفظ شامل (يُستخدم في بعض الأجزاء القديمة من الواجهة)
+    static setAllData(all){
+        if(!all || typeof all !== 'object') return false;
+        if('shareholders' in all) this.saveData(this.STORAGE_KEYS.SHAREHOLDERS, all.shareholders);
+        if('capital' in all) this.saveData(this.STORAGE_KEYS.CAPITAL, all.capital);
+        if('expenses' in all) this.saveData(this.STORAGE_KEYS.EXPENSES, all.expenses);
+        if('users' in all) this.saveData(this.STORAGE_KEYS.USERS, all.users);
+        if('settings' in all) this.saveData(this.STORAGE_KEYS.SETTINGS, all.settings);
+        if('accountingGuide' in all) this.saveData(this.STORAGE_KEYS.ACCOUNTING_GUIDE, all.accountingGuide);
+        if('creditPurchaseSuppliers' in all) this.saveData(this.STORAGE_KEYS.CREDIT_PURCHASE_SUPPLIERS, all.creditPurchaseSuppliers);
+        if('creditPurchases' in all) this.saveData(this.STORAGE_KEYS.CREDIT_PURCHASES, all.creditPurchases);
+        // إنشاء نسخة احتياطية بعد الحفظ الشامل
+        try { this.createBackup(); } catch(e){}
+        return true;
     }
 
     // Add new shareholder

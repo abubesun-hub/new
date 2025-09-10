@@ -8,6 +8,7 @@ class ExpensesManager {
     // اختيار نوع قيد الشراء بالآجل (purchase_receipt | measurement)
     this.creditPurchaseType = null;
     this.creditPurchaseSubView = null; // (suppliers | add | settlements)
+    this.editingCreditPurchaseSupplierId = null; // حالة تعديل مورد
         this.init();
     }
 
@@ -202,7 +203,12 @@ class ExpensesManager {
                         <div class="col-md-2"><label class="form-label">النوع</label><input type="text" class="form-control" id="cpSupplierType" placeholder="مواد، خدمات.." /></div>
                         <div class="col-md-2"><label class="form-label">الهاتف</label><input type="text" class="form-control" id="cpSupplierPhone" placeholder="07..." /></div>
                         <div class="col-md-4"><label class="form-label">العنوان</label><input type="text" class="form-control" id="cpSupplierAddress" placeholder="المدينة / الشارع" /></div>
-                        <div class="col-md-1 d-flex align-items-end"><button class="btn btn-success w-100" type="submit"><i class="bi bi-plus-circle"></i></button></div>
+                                <div class="col-md-1 d-flex align-items-end">
+                                    <button class="btn btn-success w-100" type="submit" id="cpSupplierSubmitBtn"><i class="bi bi-plus-circle"></i></button>
+                                </div>
+                                <div class="col-12 d-flex gap-2" id="cpSupplierEditActions" style="display:none;">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="expensesManager.cancelEditCreditPurchaseSupplier()"><i class="bi bi-x-circle"></i> إلغاء</button>
+                                </div>
                     </form>
                     <div class="small text-muted mt-1">أدخل اسم المورد واضغط حفظ للإضافة. سيتم تحديث قائمة الموردين.</div>
                 </div>
@@ -248,8 +254,26 @@ class ExpensesManager {
                 ev.preventDefault();
                 const name = document.getElementById('cpSupplierName').value.trim();
                 if(!name){ alert('اسم المورد مطلوب'); return; }
-                const newSupplier = { id: 'SUP-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), name, type: document.getElementById('cpSupplierType').value.trim(), phone: document.getElementById('cpSupplierPhone').value.trim(), address: document.getElementById('cpSupplierAddress').value.trim(), createdAt: new Date().toISOString() };
-                this.addCreditPurchaseSupplier(newSupplier); supplierForm.reset(); this.refreshCreditPurchaseSuppliersUI(); alert('تمت إضافة المورد');
+                const payload = {
+                    name,
+                    type: document.getElementById('cpSupplierType').value.trim(),
+                    phone: document.getElementById('cpSupplierPhone').value.trim(),
+                    address: document.getElementById('cpSupplierAddress').value.trim()
+                };
+                if(this.editingCreditPurchaseSupplierId){
+                    this.updateCreditPurchaseSupplier(this.editingCreditPurchaseSupplierId, payload);
+                    this.editingCreditPurchaseSupplierId = null;
+                    document.getElementById('cpSupplierSubmitBtn').innerHTML = '<i class="bi bi-plus-circle"></i>';
+                    document.getElementById('cpSupplierSubmitBtn').classList.remove('btn-warning');
+                    document.getElementById('cpSupplierSubmitBtn').classList.add('btn-success');
+                    const actions = document.getElementById('cpSupplierEditActions'); if(actions) actions.style.display='none';
+                } else {
+                    const newSupplier = { id: 'SUP-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), ...payload, createdAt: new Date().toISOString() };
+                    this.addCreditPurchaseSupplier(newSupplier);
+                }
+                supplierForm.reset();
+                this.refreshCreditPurchaseSuppliersUI();
+                alert('تم الحفظ');
             });
         }
     }
@@ -263,8 +287,7 @@ class ExpensesManager {
                 alert('يرجى اختيار نوع قيد الشراء (وصل شراء أو ذرعة محتسبة)');
                 return;
             }
-            const data = StorageManager.getAllData();
-            if (!data.creditPurchases) data.creditPurchases = [];
+            const list = StorageManager.getData(StorageManager.STORAGE_KEYS.CREDIT_PURCHASES) || [];
             const supplierId = document.getElementById('cpVendorSelect')?.value || '';
             const supplierObj = this.getCreditPurchaseSuppliers().find(s=>s.id===supplierId);
             const entry = {
@@ -284,8 +307,8 @@ class ExpensesManager {
                 notes: document.getElementById('cpNotes').value.trim(),
                 createdAt: new Date().toISOString()
             };
-            data.creditPurchases.push(entry);
-            StorageManager.setAllData(data);
+            list.push(entry);
+            StorageManager.saveData(StorageManager.STORAGE_KEYS.CREDIT_PURCHASES, list);
             this.renderCreditPurchasesTable();
             form.reset();
             // regenerate number for next entry
@@ -513,14 +536,10 @@ class ExpensesManager {
 
     // ====== إدارة موردين الشراء بالآجل ======
     getCreditPurchaseSuppliers(){
-        const data = StorageManager.getAllData();
-        if(!data.creditPurchaseSuppliers) data.creditPurchaseSuppliers = [];
-        return data.creditPurchaseSuppliers;
+        return StorageManager.getData(StorageManager.STORAGE_KEYS.CREDIT_PURCHASE_SUPPLIERS) || [];
     }
     saveCreditPurchaseSuppliers(list){
-        const data = StorageManager.getAllData();
-        data.creditPurchaseSuppliers = list;
-        StorageManager.setAllData(data);
+        StorageManager.saveData(StorageManager.STORAGE_KEYS.CREDIT_PURCHASE_SUPPLIERS, list || []);
     }
     addCreditPurchaseSupplier(supplier){
         const list = this.getCreditPurchaseSuppliers();
@@ -528,13 +547,15 @@ class ExpensesManager {
         this.saveCreditPurchaseSuppliers(list);
         return supplier;
     }
-    toggleAddSupplierForm(){
+    // إظهار/إخفاء نموذج إضافة مورد (مع دعم forceShow)
+    toggleAddSupplierForm(forceShow){
         const wrap = document.getElementById('addSupplierFormWrapper');
         const btn = document.getElementById('toggleSupplierFormBtn');
         if(!wrap) return;
-        const shown = wrap.style.display !== 'none';
-        wrap.style.display = shown ? 'none':'block';
-        if(btn) btn.textContent = shown ? 'إضافة مورد' : 'إخفاء النموذج';
+        const isShown = wrap.style.display !== 'none';
+        const target = (typeof forceShow === 'boolean') ? forceShow : !isShown;
+        wrap.style.display = target ? 'block' : 'none';
+        if(btn) btn.textContent = target ? 'إخفاء النموذج' : 'إضافة مورد';
     }
     refreshCreditPurchaseSuppliersUI(){
         const tableWrap = document.getElementById('cpSuppliersTableWrapper');
@@ -543,7 +564,7 @@ class ExpensesManager {
             if(list.length===0){
                 tableWrap.innerHTML = '<div class="text-muted small">لا توجد مورّدون مضافون بعد.</div>';
             } else {
-                tableWrap.innerHTML = `<table class="table table-sm table-striped"><thead><tr><th>الاسم</th><th>النوع</th><th>الهاتف</th><th>العنوان</th></tr></thead><tbody>${list.map(s=>`<tr><td>${s.name}</td><td>${s.type||'-'}</td><td>${s.phone||'-'}</td><td>${s.address||'-'}</td></tr>`).join('')}</tbody></table>`;
+                tableWrap.innerHTML = `<table class="table table-sm table-striped align-middle"><thead><tr><th>الاسم</th><th>النوع</th><th>الهاتف</th><th>العنوان</th><th style='width:90px'>إجراءات</th></tr></thead><tbody>${list.map(s=>`<tr><td>${s.name}</td><td>${s.type||'-'}</td><td>${s.phone||'-'}</td><td>${s.address||'-'}</td><td><div class='btn-group btn-group-sm'><button class='btn btn-outline-primary' title='تعديل' onclick="expensesManager.startEditCreditPurchaseSupplier('${s.id}')"><i class='bi bi-pencil'></i></button><button class='btn btn-outline-danger' title='حذف' onclick="expensesManager.deleteCreditPurchaseSupplier('${s.id}')"><i class='bi bi-trash'></i></button></div></td></tr>`).join('')}</tbody></table>`;
             }
         }
         const sel = document.getElementById('cpVendorSelect');
@@ -552,6 +573,46 @@ class ExpensesManager {
             sel.innerHTML = '<option value="">اختر المورد</option>' + list.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
             if(list.some(s=>s.id===current)) sel.value = current;
         }
+    }
+
+    startEditCreditPurchaseSupplier(id){
+        const supplier = this.getCreditPurchaseSuppliers().find(s=>s.id===id);
+        if(!supplier) return;
+        this.editingCreditPurchaseSupplierId = id;
+        this.toggleAddSupplierForm(true); // تأكد من ظهور النموذج
+        document.getElementById('cpSupplierName').value = supplier.name;
+        document.getElementById('cpSupplierType').value = supplier.type || '';
+        document.getElementById('cpSupplierPhone').value = supplier.phone || '';
+        document.getElementById('cpSupplierAddress').value = supplier.address || '';
+        const btn = document.getElementById('cpSupplierSubmitBtn');
+        if(btn){ btn.innerHTML = '<i class="bi bi-check2-circle"></i>'; btn.classList.remove('btn-success'); btn.classList.add('btn-warning'); }
+        const actions = document.getElementById('cpSupplierEditActions'); if(actions) actions.style.display='flex';
+    }
+
+    cancelEditCreditPurchaseSupplier(){
+        this.editingCreditPurchaseSupplierId = null;
+        const form = document.getElementById('cpSupplierForm'); if(form) form.reset();
+        const btn = document.getElementById('cpSupplierSubmitBtn');
+        if(btn){ btn.innerHTML = '<i class="bi bi-plus-circle"></i>'; btn.classList.remove('btn-warning'); btn.classList.add('btn-success'); }
+        const actions = document.getElementById('cpSupplierEditActions'); if(actions) actions.style.display='none';
+    }
+
+    updateCreditPurchaseSupplier(id, payload){
+        const list = this.getCreditPurchaseSuppliers();
+        const idx = list.findIndex(s=>s.id===id);
+        if(idx>-1){
+            list[idx] = { ...list[idx], ...payload, updatedAt: new Date().toISOString() };
+            this.saveCreditPurchaseSuppliers(list);
+        }
+    }
+
+    deleteCreditPurchaseSupplier(id){
+        if(!confirm('هل تريد حذف هذا المورد؟')) return;
+        const list = this.getCreditPurchaseSuppliers().filter(s=>s.id!==id);
+        this.saveCreditPurchaseSuppliers(list);
+        // إذا كان نحنا في وضع تعديل نفس المورد، ألغِ التعديل
+        if(this.editingCreditPurchaseSupplierId===id){ this.cancelEditCreditPurchaseSupplier(); }
+        this.refreshCreditPurchaseSuppliersUI();
     }
 
     // دالة مساعدة: توليد HTML للفوترة بتنسيق احترافي مشابه للصورة
@@ -1316,35 +1377,30 @@ class ExpensesManager {
         try {
             const all = StorageManager.getAllData();
             const entry = (all.expenses || []).find(e => e.id === id);
-            if (!entry) return this.showNotification('القيد غير موجود', 'error');
-
+            if(!entry){ this.showNotification('القيد غير موجود','error'); return; }
             this.editingId = id;
             this.showView('add-expense');
-
-            // wait for form to render
-            setTimeout(() => {
+            setTimeout(()=>{
                 this.fillAddFormFromEntry(entry);
-                // Visual hint for editing mode
                 const form = document.getElementById('expenseForm');
-                if (form) {
+                if(form){
                     const submitBtn = form.querySelector('button[type="submit"]');
-                    if (submitBtn) submitBtn.innerHTML = '<i class="bi bi-save me-2"></i>تحديث المصروف';
-                    // Add cancel editing button once
-                    if (!document.getElementById('cancelEditBtn')) {
+                    if(submitBtn) submitBtn.innerHTML = '<i class="bi bi-save me-2"></i>تحديث المصروف';
+                    if(!document.getElementById('cancelEditBtn')){
                         const cancelBtn = document.createElement('button');
-                        cancelBtn.type = 'button';
-                        cancelBtn.id = 'cancelEditBtn';
-                        cancelBtn.className = 'btn btn-outline-secondary neumorphic-btn ms-2';
-                        cancelBtn.innerHTML = '<i class="bi bi-x-circle me-2"></i>إلغاء التعديل';
-                        cancelBtn.onclick = () => { this.editingId = null; this.showView('edit-expenses'); };
+                        cancelBtn.type='button';
+                        cancelBtn.id='cancelEditBtn';
+                        cancelBtn.className='btn btn-outline-secondary neumorphic-btn ms-2';
+                        cancelBtn.innerHTML='<i class="bi bi-x-circle me-2"></i>إلغاء التعديل';
+                        cancelBtn.onclick=()=>{ this.editingId=null; this.showView('edit-expenses'); };
                         submitBtn?.parentElement?.appendChild(cancelBtn);
                     }
                 }
-                this.showNotification('وضع التعديل مفعل لهذا القيد', 'info');
-            }, 100);
-        } catch (err) {
-            console.error('startEditExpense error', err);
-            this.showNotification('حدث خطأ أثناء فتح القيد للتعديل', 'error');
+                this.showNotification('وضع التعديل مفعل لهذا القيد','info');
+            },100);
+        } catch(err){
+            console.error('startEditExpense error',err);
+            this.showNotification('حدث خطأ أثناء فتح القيد للتعديل','error');
         }
     }
 
@@ -1932,8 +1988,7 @@ class ExpensesManager {
             this.saveExpenseEntry();
         });
     }
-
-    // Save expense entry
+    
     saveExpenseEntry() {
         const formData = this.getExpenseFormData();
         if (!formData) return;
@@ -1953,8 +2008,6 @@ class ExpensesManager {
             description: formData.description,
             accountingGuide: formData.accountingGuide,
             accountingGuideCode: accountingGuideCode,
-            accountingGuideName: accountingGuideName,
-            beneficiary: formData.beneficiary,
             receiptNumber: formData.receiptNumber,
             receiptDate: formData.receiptDate,
             vendor: formData.vendor,
