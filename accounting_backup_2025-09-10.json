@@ -104,7 +104,7 @@
       "registrationNumber": "202509062801",
       "date": "2025-09-06",
       "amountIQD": 50000,
-      "amountUSD": 100,
+      "amountUSD": 90,
       "exchangeRate": 1500,
       "description": "شراء حديد تسليح ",
       "accountingGuide": "guide002",
@@ -119,11 +119,12 @@
       "project": "",
       "notes": "",
       "currency": "USD",
-      "amount": 100,
+      "amount": 90,
       "hasBothCurrencies": true,
       "hasIQDOnly": false,
       "hasUSDOnly": false,
-      "createdAt": "2025-09-06T08:33:55.373Z"
+      "createdAt": "2025-09-06T08:33:55.373Z",
+      "updatedAt": "2025-09-08T11:50:48.896Z"
     },
     {
       "id": "mf80wti1gwxt9jwy3lw",
@@ -254,6 +255,58 @@
       "hasIQDOnly": true,
       "hasUSDOnly": false,
       "createdAt": "2025-09-06T08:55:35.372Z"
+    },
+    {
+      "id": "mf9mo4bm8k5yk4yc3v5",
+      "registrationNumber": "202509070230",
+      "date": "2025-09-07",
+      "amountIQD": 10000,
+      "amountUSD": 5,
+      "exchangeRate": 1500,
+      "description": "ايجار ",
+      "accountingGuide": "guide009",
+      "accountingGuideCode": "5301",
+      "accountingGuideName": "إيجار المعدات الثقيلة",
+      "beneficiary": "1",
+      "receiptNumber": "7",
+      "receiptDate": "",
+      "vendor": "1",
+      "paymentMethod": "cash",
+      "category": "المعدات والآلات",
+      "project": "",
+      "notes": "",
+      "currency": "IQD",
+      "amount": 10000,
+      "hasBothCurrencies": true,
+      "hasIQDOnly": false,
+      "hasUSDOnly": false,
+      "createdAt": "2025-09-07T11:46:57.634Z"
+    },
+    {
+      "id": "mf9my4hpalj0qb5bbt7",
+      "registrationNumber": "202509078304",
+      "date": "2025-09-07",
+      "amountIQD": 50000,
+      "amountUSD": 0,
+      "exchangeRate": 1500,
+      "description": "نقل ",
+      "accountingGuide": "guide012",
+      "accountingGuideCode": "5401",
+      "accountingGuideName": "نقل المواد",
+      "beneficiary": "1",
+      "receiptNumber": "1",
+      "receiptDate": "",
+      "vendor": "1",
+      "paymentMethod": "cash",
+      "category": "النقل والمواصلات",
+      "project": "",
+      "notes": "",
+      "currency": "IQD",
+      "amount": 50000,
+      "hasBothCurrencies": false,
+      "hasIQDOnly": true,
+      "hasUSDOnly": false,
+      "createdAt": "2025-09-07T11:54:44.413Z"
     }
   ],
   "users": [
@@ -277,8 +330,8 @@
     "language": "ar",
     "autoBackup": true,
     "backupInterval": 3600000,
-    "programName": "نظام المحاسبة",
-    "companyName": "المبرمج احمد حسين علي",
+    "programName": "نظام المحاسبة المتقدم",
+    "companyName": "شركة بيـــسان",
     "appFont": "Tajawal",
     "printLogoDataUrl": null,
     "watermark": {
@@ -501,6 +554,18 @@
       "createdAt": "2025-09-06T08:19:16.132Z"
     }
   ],
-  "exportDate": "2025-09-07T11:37:41.510Z",
+  "creditPurchaseSuppliers": [
+    {
+      "id": "SUP-mfdwvyurkqeq",
+      "name": "احمد",
+      "type": "رمل",
+      "phone": "07905880479",
+      "address": "الرمادي",
+      "createdAt": "2025-09-10T11:44:04.659Z",
+      "updatedAt": "2025-09-10T11:44:11.560Z"
+    }
+  ],
+  "creditPurchases": [],
+  "exportDate": "2025-09-10T11:45:24.682Z",
   "version": "1.0"
 }
