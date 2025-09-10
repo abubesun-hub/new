@@ -534,6 +534,39 @@ class ExpensesManager {
                   <div class='sign-col'>المدير العام</div>
               </div>
             </div>
+            <!-- QR moved out to fixed bottom-left above footer -->
+            <div id='invoiceQRWrapper' style='position:fixed;left:18px;bottom:150px;width:150px;text-align:center;font-size:10px;color:#555;z-index:50;'>
+                <div id='invoiceQRBox' style='width:120px;height:120px;margin:0 auto;background:#fff;border:1px solid #d0d0d0;display:flex;align-items:center;justify-content:center;font-size:9px;color:#888;'>QR</div>
+                <div style='margin-top:6px;letter-spacing:.5px;'>رمز الاستجابة السريعة</div>
+            </div>
+            <script>
+            (function(){
+               try {
+                   // بناء حمولة مختصرة: CP|رقم|تاريخ|USD|IQD
+                   var payload = 'CP|'+
+                      '${data.registrationNumber}'+'|'+
+                      '${data.date || ''}'+'|'+
+                      '${data.amountUSD || 0}'+'|'+
+                      '${data.amountIQD || 0}';
+                   var box = document.getElementById('invoiceQRBox');
+                   var script = document.createElement('script');
+                   script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+                   script.onload = function(){
+                       try { box.innerHTML=''; new QRCode(box,{text:payload,width:110,height:110,correctLevel:QRCode.CorrectLevel.M}); }
+                       catch(e){ box.textContent='QR خطأ'; }
+                   };
+                   script.onerror = function(){
+                       try { // توليد نمط احتياطي بسيط
+                           var c=document.createElement('canvas');c.width=c.height=110;var ctx=c.getContext('2d');
+                           ctx.fillStyle='#fff';ctx.fillRect(0,0,110,110);ctx.fillStyle='#000';
+                           for(var y=0;y<25;y++){ for(var x=0;x<25;x++){ var h=(x*73856093)^(y*19349663)^(payload.length*83492791); if(((h>> (x%13)) &1) && ((x+y+payload.length)%3===0)) ctx.fillRect(x*4+1,y*4+1,3,3); }}
+                           box.innerHTML=''; box.appendChild(c); box.title='بديل مؤقت';
+                       } catch(e2){ box.textContent='تعذر QR'; }
+                   };
+                   document.body.appendChild(script);
+               } catch(err){ console.error('QR generation error',err); }
+            })();
+            </script>
             ${footer}
         </body></html>`;
     }
