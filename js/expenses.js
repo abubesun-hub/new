@@ -238,12 +238,13 @@ class ExpensesManager {
                 <div class="col-md-4" id="cpExchangeRateWrapper"><label class="form-label"><i class="bi bi-arrow-left-right me-1"></i>سعر الصرف</label><input type="number" class="form-control neumorphic-input" id="cpExchangeRate" value="1500" step="0.01" min="0" disabled></div>
                 <!-- حقول الذرعة المحتسبة -->
                 <div id="cpMeasurementFields" style="display:none;" class="row g-3 mx-0">
-                    <div class="col-md-3"><label class="form-label"><i class="bi bi-currency-exchange me-1"></i>العملة</label><select id="cpMeasCurrency" class="form-control neumorphic-input" disabled><option value="IQD">عراقي</option><option value="USD">دولار</option></select></div>
+                    <div class="col-md-3"><label class="form-label"><i class="bi bi-currency-exchange me-1"></i>العملة</label><select id="cpMeasCurrency" class="form-control neumorphic-input" disabled onchange="expensesManager.updateMeasurementCurrencySuffix()"><option value="IQD">عراقي</option><option value="USD">دولار</option></select></div>
                     <div class="col-md-3"><label class="form-label">النوع</label><select id="cpMeasUnitType" class="form-control neumorphic-input" disabled><option value="م2">م2</option><option value="م3">م3</option><option value="م.ط">م.ط</option><option value="عدد">عدد</option><option value="طن">طن</option></select></div>
                     <div class="col-md-2"><label class="form-label">الكمية</label><input type="number" id="cpMeasQuantity" class="form-control neumorphic-input" step="0.01" min="0" placeholder="0" disabled oninput="expensesManager.computeMeasurementTotal()"></div>
                     <div class="col-md-2"><label class="form-label">سعر الوحدة</label><input type="number" id="cpMeasUnitPrice" class="form-control neumorphic-input" step="0.01" min="0" placeholder="0.00" disabled oninput="expensesManager.computeMeasurementTotal()"></div>
                     <div class="col-md-2"><label class="form-label">الحجز (%)</label><input type="number" id="cpMeasRetention" class="form-control neumorphic-input" step="0.01" min="0" max="100" value="0" disabled oninput="expensesManager.computeMeasurementTotal()"></div>
-                    <div class="col-md-3"><label class="form-label">المبلغ الإجمالي</label><input type="text" id="cpMeasTotal" class="form-control neumorphic-input" readonly placeholder="0"></div>
+                    <div class="col-md-3"><label class="form-label">المبلغ الإجمالي</label><div class="input-group"><input type="text" id="cpMeasTotal" class="form-control neumorphic-input" readonly placeholder="0"><span class="input-group-text" id="cpMeasTotalCurrency">عراقي</span></div></div>
+                    <div class="col-md-3"><label class="form-label">مبلغ الحجز</label><div class="input-group"><input type="text" id="cpMeasRetentionAmount" class="form-control neumorphic-input" readonly placeholder="0"><span class="input-group-text" id="cpMeasRetAmountCurrency">عراقي</span></div></div>
                 </div>
                 <div class="col-md-4"><label class="form-label"><i class="bi bi-flag me-1"></i>الحالة</label><select id="cpStatus" class="form-control neumorphic-input" disabled><option value="open">مفتوح</option><option value="partial">مسدد جزئياً</option><option value="closed">مغلق</option></select></div>
                 <div class="col-md-12"><label class="form-label"><i class="bi bi-chat-text me-1"></i>ملاحظات</label><textarea id="cpNotes" class="form-control neumorphic-input" rows="2" placeholder="تفاصيل إضافية..." disabled></textarea></div>
@@ -324,6 +325,7 @@ class ExpensesManager {
                     quantity: parseFloat(document.getElementById('cpMeasQuantity')?.value)||0,
                     unitPrice: parseFloat(document.getElementById('cpMeasUnitPrice')?.value)||0,
                     retentionPct: parseFloat(document.getElementById('cpMeasRetention')?.value)||0,
+                    retentionAmount: parseFloat(document.getElementById('cpMeasRetentionAmount')?.value)||0,
                     total: totalMeas
                 } : null,
                 status: document.getElementById('cpStatus').value,
@@ -389,6 +391,8 @@ class ExpensesManager {
             ;[amountUSDW,amountIQDW,exRateW].forEach(w=>{ if(w) w.style.display='none'; });
             // تمكين حقول الذرعة
             ['cpMeasCurrency','cpMeasUnitType','cpMeasQuantity','cpMeasUnitPrice','cpMeasRetention'].forEach(id=>{ const el=document.getElementById(id); if(el) el.disabled=false; });
+            // ensure currency suffix is correct when toggled
+            this.updateMeasurementCurrencySuffix();
         }
         const desc = document.getElementById('cpDescription');
         const label = document.getElementById('cpDescriptionLabel');
@@ -411,10 +415,24 @@ class ExpensesManager {
         const price = parseFloat(document.getElementById('cpMeasUnitPrice')?.value)||0;
         const ret = Math.min(100, Math.max(0, parseFloat(document.getElementById('cpMeasRetention')?.value)||0));
         const gross = qty * price;
-        const total = gross - (gross * ret/100);
+        const retAmount = gross * ret/100;
+        const total = gross - retAmount;
         const out = document.getElementById('cpMeasTotal');
         if(out){ out.value = total.toFixed(2); }
+        const retOut = document.getElementById('cpMeasRetentionAmount');
+        if(retOut){ retOut.value = retAmount.toFixed(2); }
+        // keep currency suffixes in sync
+        this.updateMeasurementCurrencySuffix();
         return total;
+    }
+
+    updateMeasurementCurrencySuffix(){
+        const cur = document.getElementById('cpMeasCurrency')?.value || 'IQD';
+        const totalSuf = document.getElementById('cpMeasTotalCurrency');
+        const retSuf = document.getElementById('cpMeasRetAmountCurrency');
+        const label = cur==='USD' ? 'دولار' : 'عراقي';
+        if(totalSuf) totalSuf.textContent = label;
+        if(retSuf) retSuf.textContent = label;
     }
 
     renderCreditPurchasesTable() {
@@ -469,7 +487,7 @@ class ExpensesManager {
             return;
         }
     const csvRows = [
-        ['Registration','Date','Type','Vendor','Description','DueDate','AmountUSD','AmountIQD','ExchangeRate','Status','ReceiptNumber','Notes','MeasurementNumber','MeasCurrency','MeasUnitType','MeasQuantity','MeasUnitPrice','MeasRetention','MeasTotal']
+            ['Registration','Date','Type','Vendor','Description','DueDate','AmountUSD','AmountIQD','ExchangeRate','Status','ReceiptNumber','Notes','MeasurementNumber','MeasCurrency','MeasUnitType','MeasQuantity','MeasUnitPrice','MeasRetention','MeasRetentionAmount','MeasTotal']
         .join(',')
     ];
         items.forEach(it => {
@@ -491,7 +509,8 @@ class ExpensesManager {
         (it.measDetails && it.measDetails.unitType) || '',
         (it.measDetails && it.measDetails.quantity) || '',
         (it.measDetails && it.measDetails.unitPrice) || '',
-        (it.measDetails && it.measDetails.retentionPct) || '',
+                (it.measDetails && it.measDetails.retentionPct) || '',
+                (it.measDetails && it.measDetails.retentionAmount) || '',
         (it.measDetails && it.measDetails.total) || ''
             ].map(v => `"${(v!==undefined && v!==null? v : '').toString().replace(/"/g,'""')}"`).join(','));
         });
@@ -512,7 +531,7 @@ class ExpensesManager {
         const isMeas = this.creditPurchaseType==='measurement';
         const totalMeas = isMeas ? this.computeMeasurementTotal() : 0;
         const measCurrency = document.getElementById('cpMeasCurrency')?.value || 'IQD';
-        const data = {
+            const data = {
             registrationNumber: document.getElementById('cpRegistrationNumber').value,
             type: isMeas ? 'ذرعة محتسبة' : 'وصل شراء',
             vendor: supplierObj ? supplierObj.name : '',
@@ -524,14 +543,15 @@ class ExpensesManager {
             exchangeRate: document.getElementById('cpExchangeRate').value,
             status: document.getElementById('cpStatus').value,
             receiptNumber: (!isMeas) ? document.getElementById('cpPurchaseReceiptNumber').value : (document.getElementById('cpMeasurementNumber')?.value || ''),
-            notes: document.getElementById('cpNotes').value,
+                notes: document.getElementById('cpNotes').value,
             creditType: this.creditPurchaseType,
             measCurrency: measCurrency,
             measUnitType: document.getElementById('cpMeasUnitType')?.value || '',
             measQuantity: parseFloat(document.getElementById('cpMeasQuantity')?.value)||0,
             measUnitPrice: parseFloat(document.getElementById('cpMeasUnitPrice')?.value)||0,
-            measRetention: parseFloat(document.getElementById('cpMeasRetention')?.value)||0,
-            measTotal: totalMeas
+                measRetention: parseFloat(document.getElementById('cpMeasRetention')?.value)||0,
+                measRetentionAmount: parseFloat(document.getElementById('cpMeasRetentionAmount')?.value)||0,
+                measTotal: totalMeas
         };
         const container = document.getElementById('creditPurchasePreviewContent');
         if(container){
@@ -551,7 +571,9 @@ class ExpensesManager {
                                 <tr><td class="text-end fw-bold">الكمية:</td><td>${data.measQuantity}</td>
                                     <td class="text-end fw-bold">سعر الوحدة:</td><td>${data.measUnitPrice}</td></tr>
                                 <tr><td class="text-end fw-bold">الحجز (%):</td><td>${data.measRetention}</td>
-                                    <td class="text-end fw-bold">الإجمالي المحتسب:</td><td>${data.measTotal.toFixed ? data.measTotal.toFixed(2) : data.measTotal}</td></tr>
+                                    <td class="text-end fw-bold">مبلغ الحجز:</td><td>${(data.measRetentionAmount||0).toFixed ? (data.measRetentionAmount||0).toFixed(2) : (data.measRetentionAmount||0)}</td></tr>
+                                <tr><td class="text-end fw-bold">الإجمالي المحتسب:</td><td>${data.measTotal.toFixed ? data.measTotal.toFixed(2) : data.measTotal}</td>
+                                    <td></td><td></td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -791,6 +813,9 @@ class ExpensesManager {
                     <td class='label-cell'>الكمية</td><td>${data.measQuantity || 0}</td>
                     <td class='label-cell'>سعر الوحدة</td><td>${data.measUnitPrice || 0}</td>
                     <td class='label-cell'>الحجز (%)</td><td>${data.measRetention || 0}</td>
+                </tr>
+                <tr>
+                    <td class='label-cell'>مبلغ الحجز</td><td colspan='5'>${(data.measRetentionAmount||0).toFixed ? (data.measRetentionAmount||0).toFixed(2) : (data.measRetentionAmount||0)}</td>
                 </tr>` : ''}
               </table>
               <div style='margin-top:12px;font-size:13px;font-weight:600;'>الملاحظات</div>
