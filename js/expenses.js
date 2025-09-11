@@ -631,6 +631,12 @@ class ExpensesManager {
         const isMeas2 = this.creditPurchaseType==='measurement';
         const totalMeas2 = isMeas2 ? this.computeMeasurementTotal() : 0;
         const measCurrency2 = document.getElementById('cpMeasCurrency')?.value || 'IQD';
+        // احسب مبلغ الحجز لضمان ظهوره في الطباعة كما في المعاينة
+        const qty2 = parseFloat(document.getElementById('cpMeasQuantity')?.value)||0;
+        const unitPrice2 = parseFloat(document.getElementById('cpMeasUnitPrice')?.value)||0;
+        const retPct2 = parseFloat(document.getElementById('cpMeasRetention')?.value)||0;
+        const gross2 = qty2 * unitPrice2;
+        const retAmount2 = gross2 * retPct2/100;
         const data = {
             registrationNumber: document.getElementById('cpRegistrationNumber').value,
             type: isMeas2 ? 'ذرعة محتسبة' : 'وصل شراء',
@@ -650,6 +656,7 @@ class ExpensesManager {
             measQuantity: parseFloat(document.getElementById('cpMeasQuantity')?.value)||0,
             measUnitPrice: parseFloat(document.getElementById('cpMeasUnitPrice')?.value)||0,
             measRetention: parseFloat(document.getElementById('cpMeasRetention')?.value)||0,
+            measRetentionAmount: parseFloat(document.getElementById('cpMeasRetentionAmount')?.value)||retAmount2,
             measTotal: totalMeas2
         };
         const html = this.generateCreditPurchaseInvoiceHTML(data);
