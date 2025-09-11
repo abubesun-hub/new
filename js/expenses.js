@@ -163,6 +163,9 @@ class ExpensesManager {
             this.setupCreditPurchaseAddFormHandlers();
             this.refreshCreditPurchaseSuppliersUI(); // لتعبئة القائمة
             this.renderCreditPurchasesTable();
+        } else if(this.creditPurchaseSubView==='settlements'){
+            this.setupCreditPurchaseSettlementHandlers();
+            this.renderCreditPurchaseSettlementsTable();
         }
     }
 
@@ -264,7 +267,340 @@ class ExpensesManager {
     }
 
     renderCreditPurchaseSettlementSection(){
-        return `<div class="neumorphic-card"><div class="card-header d-flex justify-content-between align-items-center"><h4 class="mb-0"><i class="bi bi-wallet2 me-2"></i>تسديد مبالغ الشراء بالآجل</h4><span class="badge bg-secondary">قيد التطوير</span></div><div class="card-body text-center text-muted"><i class="bi bi-tools display-6 d-block mb-3"></i><p class="mb-1">سيتم لاحقاً إدارة دفعات الموردين لكل قيد (دفعة جزئية / كاملة / رصيد متبق).</p><p class="small">اقترح الحقول المطلوبة: رقم الدفع، تاريخ، مبلغ، عملة، مرجع القيد، ملاحظات.</p></div></div>`;
+        // لوحة التسديدات: قائمة القيود المفتوحة/الجزئية + نموذج إضافة دفعة
+        return `
+        <div class="neumorphic-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0"><i class="bi bi-wallet2 me-2"></i>تسديد مبالغ الشراء بالآجل</h4>
+                <div class="d-flex gap-2 align-items-center">
+                    <select id="cpSettlFilterVendor" class="form-select form-select-sm" style="min-width:220px">
+                        <option value="">كل الموردين</option>
+                    </select>
+                    <select id="cpSettlFilterStatus" class="form-select form-select-sm" style="min-width:160px">
+                        <option value="open">مفتوح</option>
+                        <option value="partial" selected>مسدد جزئياً</option>
+                        <option value="closed">مغلق</option>
+                        <option value="all">الكل</option>
+                    </select>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-lg-7">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>القيد</th>
+                                        <th>المورد</th>
+                                        <th>التاريخ</th>
+                                        <th>إجمالي $</th>
+                                        <th>مسدد $</th>
+                                        <th>متبق $</th>
+                                        <th>إجمالي د.ع</th>
+                                        <th>مسدد د.ع</th>
+                                        <th>متبق د.ع</th>
+                                        <th>الحالة</th>
+                                        <th>إجراء</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cpSettlementsTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="col-lg-5">
+                        <div class="border rounded p-3 bg-light">
+                            <h6 class="mb-3"><i class="bi bi-cash-coin me-1"></i>إضافة دفعة</h6>
+                            <form id="cpSettlementForm" class="row g-2">
+                                <div class="col-12">
+                                    <label class="form-label small">القيد المختار</label>
+                                    <input type="text" id="cpSettlReg" class="form-control form-control-sm" readonly placeholder="اختر قيداً من الجدول">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">المورد</label>
+                                    <input type="text" id="cpSettlVendor" class="form-control form-control-sm" readonly>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">تاريخ الدفع</label>
+                                    <input type="date" id="cpSettlDate" class="form-control form-control-sm" value="${new Date().toISOString().split('T')[0]}">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">إجمالي القيد $</label>
+                                    <input type="text" id="cpSettlTotalUSD" class="form-control form-control-sm" readonly>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">إجمالي القيد د.ع</label>
+                                    <input type="text" id="cpSettlTotalIQD" class="form-control form-control-sm" readonly>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">المسدد حتى الآن $</label>
+                                    <input type="text" id="cpSettlPaidUSD" class="form-control form-control-sm" readonly>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">المسدد حتى الآن د.ع</label>
+                                    <input type="text" id="cpSettlPaidIQD" class="form-control form-control-sm" readonly>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">المتبقي $</label>
+                                    <input type="text" id="cpSettlRemainUSD" class="form-control form-control-sm" readonly>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">المتبقي د.ع</label>
+                                    <input type="text" id="cpSettlRemainIQD" class="form-control form-control-sm" readonly>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">مبلغ الدفع (دولار)</label>
+                                    <input type="number" step="0.01" min="0" id="cpSettlPayUSD" class="form-control form-control-sm" placeholder="0.00">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">مبلغ الدفع (دينار)</label>
+                                    <input type="number" step="1" min="0" id="cpSettlPayIQD" class="form-control form-control-sm" placeholder="0">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">سعر الصرف</label>
+                                    <input type="number" step="0.01" min="0" id="cpSettlExRate" class="form-control form-control-sm" value="1500">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">طريقة الدفع</label>
+                                    <select id="cpSettlMethod" class="form-select form-select-sm">
+                                        <option value="cash">نقداً</option>
+                                        <option value="bank_transfer">تحويل بنكي</option>
+                                        <option value="check">شيك</option>
+                                        <option value="electronic_payment">دفع إلكتروني</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">رقم مرجع/وصل</label>
+                                    <input type="text" id="cpSettlRef" class="form-control form-control-sm" placeholder="اختياري">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label small">ملاحظات</label>
+                                    <textarea id="cpSettlNotes" rows="2" class="form-control form-control-sm" placeholder="تفاصيل إضافية"></textarea>
+                                </div>
+                                <div class="col-12 d-flex align-items-center gap-2">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="cpSettlCreateExpense" checked>
+                                        <label class="form-check-label small" for="cpSettlCreateExpense">إنشاء قيد مصروف تلقائياً لهذا الدفع</label>
+                                    </div>
+                                </div>
+                                <div class="col-12 d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>حفظ الدفعة</button>
+                                    <button type="button" class="btn btn-secondary btn-sm" id="cpSettlResetBtn"><i class="bi bi-arrow-counterclockwise me-1"></i>إعادة</button>
+                                </div>
+                                <div class="col-12 small text-muted">يتم منع تجاوز المبلغ المتبقي تلقائياً.</div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    // ====== منطق التسديدات ======
+    setupCreditPurchaseSettlementHandlers(){
+        // تعبئة فلاتر الموردين
+        try {
+            const vendors = this.getCreditPurchaseSuppliers();
+            const sel = document.getElementById('cpSettlFilterVendor');
+            if(sel){
+                const current = sel.value;
+                sel.innerHTML = '<option value="">كل الموردين</option>' + vendors.map(v => `<option value="${v.id}">${v.name}</option>`).join('');
+                if(current) sel.value = current;
+                sel.onchange = ()=> this.renderCreditPurchaseSettlementsTable();
+            }
+            const statusSel = document.getElementById('cpSettlFilterStatus');
+            if(statusSel){ statusSel.onchange = ()=> this.renderCreditPurchaseSettlementsTable(); }
+        } catch(e){ console.warn('setupCreditPurchaseSettlementHandlers vendors error', e); }
+
+        const form = document.getElementById('cpSettlementForm');
+        if(form){
+            form.addEventListener('submit', (ev)=>{
+                ev.preventDefault();
+                const reg = document.getElementById('cpSettlReg')?.value || '';
+                if(!reg){ alert('الرجاء اختيار قيد من الجدول أولاً'); return; }
+                const payUSD = parseFloat(document.getElementById('cpSettlPayUSD')?.value)||0;
+                const payIQD = parseFloat(document.getElementById('cpSettlPayIQD')?.value)||0;
+                if(payUSD<=0 && payIQD<=0){ alert('أدخل مبلغ دفع بالدولار أو الدينار'); return; }
+                const data = {
+                    date: document.getElementById('cpSettlDate')?.value || new Date().toISOString().split('T')[0],
+                    amountUSD: payUSD,
+                    amountIQD: payIQD,
+                    exchangeRate: parseFloat(document.getElementById('cpSettlExRate')?.value)||1500,
+                    method: document.getElementById('cpSettlMethod')?.value || 'cash',
+                    reference: document.getElementById('cpSettlRef')?.value || '',
+                    notes: document.getElementById('cpSettlNotes')?.value || '',
+                    createExpense: !!document.getElementById('cpSettlCreateExpense')?.checked
+                };
+                this.addCreditPurchasePayment(reg, data);
+            });
+        }
+        const resetBtn = document.getElementById('cpSettlResetBtn');
+        if(resetBtn){ resetBtn.onclick = ()=>{
+            const f = document.getElementById('cpSettlementForm');
+            f?.reset();
+            // لا نمسح معلومات القيد المختار
+            const regEl = document.getElementById('cpSettlReg');
+            if(regEl && regEl.value){
+                // أعد تعبئة الملخص
+                this.selectCPForSettlement(regEl.value);
+            }
+        } }
+    }
+
+    renderCreditPurchaseSettlementsTable(){
+        const body = document.getElementById('cpSettlementsTableBody');
+        if(!body) return;
+        const all = StorageManager.getData(StorageManager.STORAGE_KEYS.CREDIT_PURCHASES) || [];
+        const vendorId = document.getElementById('cpSettlFilterVendor')?.value || '';
+        const status = document.getElementById('cpSettlFilterStatus')?.value || 'partial';
+        const filtered = all.filter(cp => {
+            if(vendorId && (cp.vendorId||'')!==vendorId) return false;
+            if(status!== 'all' && (cp.status||'open')!==status) return false;
+            return true;
+        }).sort((a,b)=> new Date(b.date) - new Date(a.date));
+
+        if(filtered.length===0){
+            body.innerHTML = `<tr><td colspan="11" class="text-center text-muted py-3"><i class="bi bi-inbox"></i> لا توجد قيود</td></tr>`;
+            return;
+        }
+
+        body.innerHTML = filtered.map(cp =>{
+            const paid = this.getCPPaidSums(cp);
+            const remain = this.getCPRemaining(cp, paid);
+            return `
+                <tr>
+                    <td>${cp.registrationNumber}</td>
+                    <td>${cp.vendor||'-'}</td>
+                    <td>${new Date(cp.date).toLocaleDateString('ar-IQ')}</td>
+                    <td>${this.formatCurrency(cp.amountUSD||0,'USD')}</td>
+                    <td>${this.formatCurrency(paid.usd,'USD')}</td>
+                    <td>${this.formatCurrency(remain.usd,'USD')}</td>
+                    <td>${this.formatCurrency(cp.amountIQD||0,'IQD')}</td>
+                    <td>${this.formatCurrency(paid.iqd,'IQD')}</td>
+                    <td>${this.formatCurrency(remain.iqd,'IQD')}</td>
+                    <td><span class="badge bg-${(cp.status||'open')==='closed'?'success':(cp.status==='partial'?'warning':'secondary')}">${cp.status||'open'}</span></td>
+                    <td><button class="btn btn-sm btn-outline-primary" onclick="expensesManager.selectCPForSettlement('${cp.registrationNumber}')"><i class="bi bi-wallet2"></i></button></td>
+                </tr>`;
+        }).join('');
+    }
+
+    selectCPForSettlement(regNo){
+        const all = StorageManager.getData(StorageManager.STORAGE_KEYS.CREDIT_PURCHASES) || [];
+        const cp = all.find(x=> x.registrationNumber===regNo);
+        if(!cp) { alert('القيد غير موجود'); return; }
+        // عبئ الملخص
+        const paid = this.getCPPaidSums(cp);
+        const remain = this.getCPRemaining(cp, paid);
+        const set = (id,val)=>{ const el=document.getElementById(id); if(el) el.value = (val??''); };
+        set('cpSettlReg', cp.registrationNumber);
+        set('cpSettlVendor', cp.vendor || '');
+        set('cpSettlTotalUSD', this.formatCurrency(cp.amountUSD||0,'USD'));
+        set('cpSettlTotalIQD', this.formatCurrency(cp.amountIQD||0,'IQD'));
+        set('cpSettlPaidUSD', this.formatCurrency(paid.usd,'USD'));
+        set('cpSettlPaidIQD', this.formatCurrency(paid.iqd,'IQD'));
+        set('cpSettlRemainUSD', this.formatCurrency(remain.usd,'USD'));
+        set('cpSettlRemainIQD', this.formatCurrency(remain.iqd,'IQD'));
+        // اقترح سعر الصرف من القيد
+        const ex = document.getElementById('cpSettlExRate'); if(ex){ ex.value = cp.exchangeRate || ex.value || 1500; }
+        // صفّر مبالغ الدفع
+        const usdIn = document.getElementById('cpSettlPayUSD'); if(usdIn) usdIn.value='';
+        const iqdIn = document.getElementById('cpSettlPayIQD'); if(iqdIn) iqdIn.value='';
+        // مرر الحالة للجدول (قد تتغير بعد الدفع)
+    }
+
+    getCPPaidSums(cp){
+        const pays = Array.isArray(cp.payments) ? cp.payments : [];
+        return pays.reduce((acc,p)=>{
+            acc.usd += parseFloat(p.amountUSD)||0;
+            acc.iqd += parseFloat(p.amountIQD)||0;
+            return acc;
+        }, {usd:0, iqd:0});
+    }
+
+    getCPRemaining(cp, paid){
+        const totalUSD = parseFloat(cp.amountUSD)||0;
+        const totalIQD = parseFloat(cp.amountIQD)||0;
+        const remUSD = Math.max(0, totalUSD - (paid?.usd||0));
+        const remIQD = Math.max(0, totalIQD - (paid?.iqd||0));
+        return { usd: remUSD, iqd: remIQD };
+    }
+
+    clampPaymentToRemaining(rem, pay){
+        const out = { usd: pay.usd, iqd: pay.iqd };
+        if(out.usd > rem.usd){ out.usd = rem.usd; }
+        if(out.iqd > rem.iqd){ out.iqd = rem.iqd; }
+        return out;
+    }
+
+    addCreditPurchasePayment(regNo, payment){
+        const list = StorageManager.getData(StorageManager.STORAGE_KEYS.CREDIT_PURCHASES) || [];
+        const idx = list.findIndex(x=> x.registrationNumber===regNo);
+        if(idx===-1){ alert('القيد غير موجود'); return; }
+        const cp = list[idx];
+        // احسب المتبقي لمنع التجاوز
+        const paid = this.getCPPaidSums(cp);
+        const rem = this.getCPRemaining(cp, paid);
+        const requested = { usd: payment.amountUSD||0, iqd: payment.amountIQD||0 };
+        const clamped = this.clampPaymentToRemaining(rem, requested);
+        if(clamped.usd <= 0 && clamped.iqd <= 0){ alert('لا يوجد رصيد متبق لهذا القيد'); return; }
+        if(clamped.usd !== requested.usd || clamped.iqd !== requested.iqd){
+            alert('تم ضبط مبالغ الدفع تلقائياً إلى الحد المتبقي.');
+        }
+        const payEntry = {
+            id: 'PAY-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+            date: payment.date,
+            amountUSD: clamped.usd,
+            amountIQD: clamped.iqd,
+            exchangeRate: payment.exchangeRate||cp.exchangeRate||1500,
+            method: payment.method||'cash',
+            reference: payment.reference||'',
+            notes: payment.notes||''
+        };
+        const payments = Array.isArray(cp.payments)? cp.payments.slice() : [];
+        payments.push(payEntry);
+        const newPaid = { usd: paid.usd + clamped.usd, iqd: paid.iqd + clamped.iqd };
+        const newRem = { usd: Math.max(0,(parseFloat(cp.amountUSD)||0) - newPaid.usd), iqd: Math.max(0,(parseFloat(cp.amountIQD)||0) - newPaid.iqd) };
+        const newStatus = (newRem.usd===0 && newRem.iqd===0) ? 'closed' : ((newPaid.usd>0 || newPaid.iqd>0) ? 'partial' : (cp.status||'open'));
+        list[idx] = { ...cp, payments, status: newStatus, updatedAt: new Date().toISOString() };
+        const ok = StorageManager.saveData(StorageManager.STORAGE_KEYS.CREDIT_PURCHASES, list);
+        if(!ok){ alert('فشل حفظ الدفعة'); return; }
+        // أنشئ قيد مصروف مرتبط إذا طُلب
+        if(payment.createExpense){
+            try { this.createExpenseForCPPayment(list[idx], payEntry); } catch(e){ console.warn('createExpenseForCPPayment error', e); }
+        }
+        // تحديث الواجهات
+        this.renderCreditPurchaseSettlementsTable();
+        // حدّث نموذج الملخص للقيد الحالي
+        this.selectCPForSettlement(regNo);
+        this.showNotification('تم حفظ الدفعة بنجاح', 'success');
+    }
+
+    createExpenseForCPPayment(cp, payEntry){
+        const desc = `تسديد شراء آجل رقم ${cp.registrationNumber} - ${cp.vendor||''}`.trim();
+        const expense = {
+            registrationNumber: StorageManager.generateRegistrationNumber(),
+            date: payEntry.date,
+            amountIQD: payEntry.amountIQD||0,
+            amountUSD: payEntry.amountUSD||0,
+            exchangeRate: payEntry.exchangeRate||cp.exchangeRate||1500,
+            description: desc,
+            accountingGuide: '',
+            accountingGuideCode: '',
+            receiptNumber: payEntry.reference||'',
+            receiptDate: payEntry.date,
+            vendor: cp.vendor||'',
+            paymentMethod: payEntry.method||'cash',
+            category: 'تسديد مشتريات آجل',
+            project: '',
+            notes: payEntry.notes||'',
+            currency: this.determinePrimaryCurrency(payEntry.amountIQD||0, payEntry.amountUSD||0, payEntry.exchangeRate||cp.exchangeRate||1500),
+            amount: this.calculatePrimaryAmount ? this.calculatePrimaryAmount(payEntry.amountIQD||0, payEntry.amountUSD||0, payEntry.exchangeRate||cp.exchangeRate||1500) : ((payEntry.amountUSD||0) || (payEntry.amountIQD||0)),
+            hasBothCurrencies: (payEntry.amountUSD||0) > 0 && (payEntry.amountIQD||0) > 0,
+            hasIQDOnly: (payEntry.amountIQD||0) > 0 && (payEntry.amountUSD||0) === 0,
+            hasUSDOnly: (payEntry.amountUSD||0) > 0 && (payEntry.amountIQD||0) === 0
+        };
+        const newEntry = StorageManager.addExpenseEntry(expense);
+        if(!newEntry){ console.warn('Failed to create expense for payment'); }
     }
 
     setupCreditPurchaseSuppliersHandlers(){
@@ -2366,7 +2702,8 @@ class ExpensesManager {
             'المكتب والإدارة',
             'التسويق والإعلان',
             'الاستشارات المهنية',
-            'أخرى'
+            'أخرى',
+            'تسديد مشتريات آجل'
         ];
     }
 
