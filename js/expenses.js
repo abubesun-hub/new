@@ -220,20 +220,31 @@ class ExpensesManager {
     renderCreditPurchaseAddSection(){
         const suppliers = this.getCreditPurchaseSuppliers();
         return `<div class="neumorphic-card">
-            <div class="card-header d-flex justify-content-between align-items-center"><h4 class="mb-0"><i class="bi bi-cart-check me-2"></i>إضافة قيد شراء بالآجل</h4><span class="badge bg-warning text-dark">تجريبي</span></div>
+            <div class="card-header d-flex justify-content-between align-items-center"><h4 class="mb-0"><i class="bi bi-cart-check me-2"></i>إضافة قيد شراء بالآجل</h4></div>
             <div class="card-body">
             <p class="text-muted mb-2">اختر <strong>نوع القيد</strong> أولاً ثم أكمل البيانات.</p>
             <div class="mb-3" id="cpTypeSelector"><label class="form-label"><i class="bi bi-ui-checks me-1"></i>نوع قيد الشراء بالآجل</label><div class="d-flex gap-2 flex-wrap"><button type="button" class="btn btn-outline-primary cp-type-btn" onclick="expensesManager.selectCreditPurchaseType('purchase_receipt')"><i class="bi bi-receipt"></i> وصل شراء</button><button type="button" class="btn btn-outline-primary cp-type-btn" onclick="expensesManager.selectCreditPurchaseType('measurement')"><i class="bi bi-rulers"></i> ذرعة محتسبة</button><span id="cpTypeSelectedBadge" class="badge bg-secondary align-self-center" style="display:none"></span></div></div>
             <form id="creditPurchaseForm" class="row g-3">
                 <div class="col-md-3"><label class="form-label"><i class="bi bi-hash me-1"></i>رقم القيد</label><input type="text" class="form-control neumorphic-input" id="cpRegistrationNumber" value="CP-${Date.now().toString().slice(-6)}" readonly></div>
-                <div class="col-md-3"><label class="form-label"><i class="bi bi-calendar me-1"></i>تاريخ الشراء</label><input type="date" class="form-control neumorphic-input" id="cpDate" value="${new Date().toISOString().split('T')[0]}" required></div>
+                <div class="col-md-3"><label class="form-label" id="cpDateLabel"><i class="bi bi-calendar me-1"></i>تاريخ الشراء</label><input type="date" class="form-control neumorphic-input" id="cpDate" value="${new Date().toISOString().split('T')[0]}" required></div>
                 <div class="col-md-6"><label class="form-label"><i class="bi bi-building me-1"></i>المورد</label><select class="form-control neumorphic-input" id="cpVendorSelect" required disabled><option value="">اختر المورد</option>${suppliers.map(s=>`<option value='${s.id}'>${s.name}</option>`).join('')}</select></div>
                 <div class="col-md-3" id="cpPurchaseReceiptNumberWrapper" style="display:none;"><label class="form-label"><i class="bi bi-receipt me-1"></i>رقم وصل الشراء</label><input type="text" class="form-control neumorphic-input" id="cpPurchaseReceiptNumber" placeholder="رقم الوصل" disabled></div>
-                <div class="col-md-8"><label class="form-label" id="cpDescriptionLabel"><i class="bi bi-file-text me-1"></i>الوصف</label><input type="text" class="form-control neumorphic-input" id="cpDescription" placeholder="اختر نوع القيد أولاً" required disabled></div>
+                <div class="col-md-3" id="cpMeasurementNumberWrapper" style="display:none;"><label class="form-label"><i class="bi bi-rulers me-1"></i>رقم وصل الشراء/ الذرعة</label><input type="text" class="form-control neumorphic-input" id="cpMeasurementNumber" placeholder="رقم وصل الشراء/ الذرعة" disabled></div>
+                <div class="col-md-8"><label class="form-label" id="cpDescriptionLabel"><i class="bi bi-file-text me-1"></i>وصف الشراء</label><input type="text" class="form-control neumorphic-input" id="cpDescription" placeholder="اختر نوع القيد أولاً" required disabled></div>
                 <div class="col-md-4"><label class="form-label"><i class="bi bi-calendar-event me-1"></i>تاريخ الاستحقاق</label><input type="date" class="form-control neumorphic-input" id="cpDueDate" disabled></div>
-                <div class="col-md-4"><label class="form-label"><i class="bi bi-currency-dollar me-1"></i>المبلغ بالدولار</label><input type="number" class="form-control neumorphic-input" id="cpAmountUSD" step="0.01" min="0" placeholder="0.00" disabled></div>
-                <div class="col-md-4"><label class="form-label"><i class="bi bi-cash me-1"></i>المبلغ بالدينار</label><input type="number" class="form-control neumorphic-input" id="cpAmountIQD" step="1" min="0" placeholder="0" disabled></div>
-                <div class="col-md-4"><label class="form-label"><i class="bi bi-arrow-left-right me-1"></i>سعر الصرف</label><input type="number" class="form-control neumorphic-input" id="cpExchangeRate" value="1500" step="0.01" min="0" disabled></div>
+                <!-- مبالغ وصل الشراء -->
+                <div class="col-md-4" id="cpAmountUSDWrapper"><label class="form-label"><i class="bi bi-currency-dollar me-1"></i>المبلغ بالدولار</label><input type="number" class="form-control neumorphic-input" id="cpAmountUSD" step="0.01" min="0" placeholder="0.00" disabled></div>
+                <div class="col-md-4" id="cpAmountIQDWrapper"><label class="form-label"><i class="bi bi-cash me-1"></i>المبلغ بالدينار</label><input type="number" class="form-control neumorphic-input" id="cpAmountIQD" step="1" min="0" placeholder="0" disabled></div>
+                <div class="col-md-4" id="cpExchangeRateWrapper"><label class="form-label"><i class="bi bi-arrow-left-right me-1"></i>سعر الصرف</label><input type="number" class="form-control neumorphic-input" id="cpExchangeRate" value="1500" step="0.01" min="0" disabled></div>
+                <!-- حقول الذرعة المحتسبة -->
+                <div id="cpMeasurementFields" style="display:none;" class="row g-3 mx-0">
+                    <div class="col-md-3"><label class="form-label"><i class="bi bi-currency-exchange me-1"></i>العملة</label><select id="cpMeasCurrency" class="form-control neumorphic-input" disabled><option value="IQD">عراقي</option><option value="USD">دولار</option></select></div>
+                    <div class="col-md-3"><label class="form-label">النوع</label><select id="cpMeasUnitType" class="form-control neumorphic-input" disabled><option value="م2">م2</option><option value="م3">م3</option><option value="م.ط">م.ط</option><option value="عدد">عدد</option><option value="طن">طن</option></select></div>
+                    <div class="col-md-2"><label class="form-label">الكمية</label><input type="number" id="cpMeasQuantity" class="form-control neumorphic-input" step="0.01" min="0" placeholder="0" disabled oninput="expensesManager.computeMeasurementTotal()"></div>
+                    <div class="col-md-2"><label class="form-label">سعر الوحدة</label><input type="number" id="cpMeasUnitPrice" class="form-control neumorphic-input" step="0.01" min="0" placeholder="0.00" disabled oninput="expensesManager.computeMeasurementTotal()"></div>
+                    <div class="col-md-2"><label class="form-label">الحجز (%)</label><input type="number" id="cpMeasRetention" class="form-control neumorphic-input" step="0.01" min="0" max="100" value="0" disabled oninput="expensesManager.computeMeasurementTotal()"></div>
+                    <div class="col-md-3"><label class="form-label">المبلغ الإجمالي</label><input type="text" id="cpMeasTotal" class="form-control neumorphic-input" readonly placeholder="0"></div>
+                </div>
                 <div class="col-md-4"><label class="form-label"><i class="bi bi-flag me-1"></i>الحالة</label><select id="cpStatus" class="form-control neumorphic-input" disabled><option value="open">مفتوح</option><option value="partial">مسدد جزئياً</option><option value="closed">مغلق</option></select></div>
                 <div class="col-md-12"><label class="form-label"><i class="bi bi-chat-text me-1"></i>ملاحظات</label><textarea id="cpNotes" class="form-control neumorphic-input" rows="2" placeholder="تفاصيل إضافية..." disabled></textarea></div>
                 <div class="col-12 d-flex gap-2 flex-wrap"><button type="submit" class="btn btn-primary neumorphic-btn" id="cpSubmitBtn" disabled><i class="bi bi-save me-1"></i>حفظ</button><button type="reset" class="btn btn-secondary neumorphic-btn" id="cpResetBtn" disabled><i class="bi bi-arrow-counterclockwise me-1"></i>تفريغ</button><button type="button" class="btn btn-info neumorphic-btn" id="cpPreviewBtn" disabled onclick="expensesManager.previewCreditPurchase()"><i class="bi bi-eye me-1"></i>معاينة</button><button type="button" class="btn btn-warning neumorphic-btn" id="cpPrintBtn" disabled onclick="expensesManager.printCreditPurchaseInvoice()"><i class="bi bi-printer me-1"></i>طباعة فوترة</button><button type="button" class="btn btn-outline-success neumorphic-btn" onclick="expensesManager.exportCreditPurchases()"><i class="bi bi-file-earmark-excel me-1"></i>تصدير السجل</button></div>
@@ -290,19 +301,31 @@ class ExpensesManager {
             const list = StorageManager.getData(StorageManager.STORAGE_KEYS.CREDIT_PURCHASES) || [];
             const supplierId = document.getElementById('cpVendorSelect')?.value || '';
             const supplierObj = this.getCreditPurchaseSuppliers().find(s=>s.id===supplierId);
+            const isMeas = this.creditPurchaseType === 'measurement';
+            const measCurrency = document.getElementById('cpMeasCurrency')?.value || 'IQD';
+            const totalMeas = isMeas ? this.computeMeasurementTotal() : 0;
             const entry = {
                 type: 'credit_purchase',
                 creditType: this.creditPurchaseType,
                 purchaseReceiptNumber: this.creditPurchaseType === 'purchase_receipt' ? (document.getElementById('cpPurchaseReceiptNumber').value || '') : '',
+                measurementNumber: isMeas ? (document.getElementById('cpMeasurementNumber')?.value || '') : '',
                 registrationNumber: document.getElementById('cpRegistrationNumber').value,
                 date: document.getElementById('cpDate').value,
                 vendor: supplierObj ? supplierObj.name : '',
                 vendorId: supplierObj ? supplierObj.id : null,
                 description: document.getElementById('cpDescription').value.trim(),
                 dueDate: document.getElementById('cpDueDate').value || null,
-                amountUSD: parseFloat(document.getElementById('cpAmountUSD').value) || 0,
-                amountIQD: parseFloat(document.getElementById('cpAmountIQD').value) || 0,
-                exchangeRate: parseFloat(document.getElementById('cpExchangeRate').value) || 0,
+                amountUSD: isMeas ? (measCurrency==='USD' ? totalMeas : 0) : (parseFloat(document.getElementById('cpAmountUSD').value) || 0),
+                amountIQD: isMeas ? (measCurrency==='IQD' ? totalMeas : 0) : (parseFloat(document.getElementById('cpAmountIQD').value) || 0),
+                exchangeRate: isMeas ? (parseFloat(document.getElementById('cpExchangeRate')?.value)||1500) : (parseFloat(document.getElementById('cpExchangeRate').value) || 0),
+                measDetails: isMeas ? {
+                    currency: measCurrency,
+                    unitType: document.getElementById('cpMeasUnitType')?.value || '',
+                    quantity: parseFloat(document.getElementById('cpMeasQuantity')?.value)||0,
+                    unitPrice: parseFloat(document.getElementById('cpMeasUnitPrice')?.value)||0,
+                    retentionPct: parseFloat(document.getElementById('cpMeasRetention')?.value)||0,
+                    total: totalMeas
+                } : null,
                 status: document.getElementById('cpStatus').value,
                 notes: document.getElementById('cpNotes').value.trim(),
                 createdAt: new Date().toISOString()
@@ -325,28 +348,53 @@ class ExpensesManager {
             btn.classList.toggle('btn-primary', isSelected);
             btn.classList.toggle('btn-outline-primary', !isSelected);
         });
-        // تفعيل الحقول
-        ['cpDescription','cpDueDate','cpAmountUSD','cpAmountIQD','cpExchangeRate','cpStatus','cpNotes','cpSubmitBtn','cpResetBtn'].forEach(id => {
+        // تفعيل الحقول العامة
+        ['cpDescription','cpDueDate','cpStatus','cpNotes','cpSubmitBtn','cpResetBtn'].forEach(id => {
             const el = document.getElementById(id);
             if(el) el.disabled = false;
         });
-    const vSel = document.getElementById('cpVendorSelect'); if(vSel) vSel.disabled = false;
+        const vSel = document.getElementById('cpVendorSelect'); if(vSel) vSel.disabled = false;
         ['cpPreviewBtn','cpPrintBtn'].forEach(id=>{const el=document.getElementById(id); if(el) el.disabled=false;});
-        // إظهار / إخفاء حقل رقم وصل الشراء
+
         const receiptWrap = document.getElementById('cpPurchaseReceiptNumberWrapper');
         const receiptInput = document.getElementById('cpPurchaseReceiptNumber');
+        const measWrap = document.getElementById('cpMeasurementFields');
+        const measNumWrap = document.getElementById('cpMeasurementNumberWrapper');
+        const measNumInput = document.getElementById('cpMeasurementNumber');
+        const dateLabel = document.getElementById('cpDateLabel');
+        const amountUSDW = document.getElementById('cpAmountUSDWrapper');
+        const amountIQDW = document.getElementById('cpAmountIQDWrapper');
+        const exRateW = document.getElementById('cpExchangeRateWrapper');
+        // تبديل بين وضع الوصل والذرعة
         if(type === 'purchase_receipt'){
-            if(receiptWrap) receiptWrap.style.display='block';
-            if(receiptInput) receiptInput.disabled = false;
+            // وصل شراء
+            if(dateLabel) dateLabel.innerHTML = '<i class="bi bi-calendar me-1"></i>تاريخ الشراء';
+            if(receiptWrap){ receiptWrap.style.display='block'; }
+            if(receiptInput){ receiptInput.disabled=false; }
+            if(measWrap) measWrap.style.display='none';
+            if(measNumWrap) measNumWrap.style.display='none';
+            if(measNumInput){ measNumInput.disabled = true; measNumInput.value=''; }
+            // مبالغ مباشرة
+            ;[amountUSDW,amountIQDW,exRateW].forEach(w=>{ if(w) w.style.display='block'; });
+            // تمكين مدخلات المبالغ
+            ['cpAmountUSD','cpAmountIQD','cpExchangeRate'].forEach(id=>{ const el=document.getElementById(id); if(el) el.disabled=false; });
         } else {
-            if(receiptWrap) receiptWrap.style.display='none';
-            if(receiptInput){ receiptInput.disabled = true; receiptInput.value=''; }
+            // ذرعة محتسبة
+            if(dateLabel) dateLabel.innerHTML = '<i class="bi bi-calendar me-1"></i>تاريخ الاحتساب';
+            if(receiptWrap){ receiptWrap.style.display='none'; }
+            if(receiptInput){ receiptInput.disabled=true; receiptInput.value=''; }
+            if(measWrap) measWrap.style.display='flex';
+            if(measNumWrap) measNumWrap.style.display='block';
+            if(measNumInput){ measNumInput.disabled = false; }
+            ;[amountUSDW,amountIQDW,exRateW].forEach(w=>{ if(w) w.style.display='none'; });
+            // تمكين حقول الذرعة
+            ['cpMeasCurrency','cpMeasUnitType','cpMeasQuantity','cpMeasUnitPrice','cpMeasRetention'].forEach(id=>{ const el=document.getElementById(id); if(el) el.disabled=false; });
         }
         const desc = document.getElementById('cpDescription');
         const label = document.getElementById('cpDescriptionLabel');
         const badge = document.getElementById('cpTypeSelectedBadge');
         if(type === 'measurement'){
-            if(label) label.innerHTML = '<i class="bi bi-rulers me-1"></i>وصف الذرعة';
+            if(label) label.innerHTML = '<i class="bi bi-rulers me-1"></i>وصف الشراء';
             if(desc) desc.placeholder = 'مثال: ذرعة أعمال ...';
             if(badge){ badge.textContent = 'ذرعة محتسبة'; badge.style.display='inline-block'; }
         } else {
@@ -355,6 +403,18 @@ class ExpensesManager {
             if(badge){ badge.textContent = 'وصل شراء'; badge.style.display='inline-block'; }
         }
         if(desc) desc.focus();
+    }
+
+    // حساب إجمالي الذرعة: الكمية * سعر الوحدة - الحجز%
+    computeMeasurementTotal(){
+        const qty = parseFloat(document.getElementById('cpMeasQuantity')?.value)||0;
+        const price = parseFloat(document.getElementById('cpMeasUnitPrice')?.value)||0;
+        const ret = Math.min(100, Math.max(0, parseFloat(document.getElementById('cpMeasRetention')?.value)||0));
+        const gross = qty * price;
+        const total = gross - (gross * ret/100);
+        const out = document.getElementById('cpMeasTotal');
+        if(out){ out.value = total.toFixed(2); }
+        return total;
     }
 
     renderCreditPurchasesTable() {
@@ -382,7 +442,7 @@ class ExpensesManager {
             <table class="table table-sm table-striped align-middle">
                 <thead>
                     <tr>
-                        <th>القيد</th><th>التاريخ</th><th>النوع</th><th>المورد</th><th>الوصف</th><th>الاستحقاق</th><th>دولار</th><th>دينار</th><th>الحالة</th><th>رقم الوصل</th>
+                        <th>القيد</th><th>التاريخ/الاحتساب</th><th>النوع</th><th>المورد</th><th>الوصف</th><th>الاستحقاق</th><th>دولار</th><th>دينار</th><th>الحالة</th><th>رقم وصل الشراء/ الذرعة</th>
                     </tr>
                 </thead>
                 <tbody>${items.map(it => `
@@ -396,7 +456,7 @@ class ExpensesManager {
                         <td>${this.formatCurrency(it.amountUSD, 'USD')}</td>
                         <td>${this.formatCurrency(it.amountIQD, 'IQD')}</td>
                         <td>${it.status}</td>
-                        <td>${it.purchaseReceiptNumber || '-'}</td>
+                        <td>${it.creditType==='measurement' ? (it.measurementNumber || '-') : (it.purchaseReceiptNumber || '-')}</td>
                     </tr>`).join('')}</tbody>
             </table>`;
     }
@@ -408,10 +468,10 @@ class ExpensesManager {
             alert('لا توجد بيانات للتصدير');
             return;
         }
-        const csvRows = [
-            ['Registration','Date','Type','Vendor','Description','DueDate','AmountUSD','AmountIQD','ExchangeRate','Status','ReceiptNumber','Notes']
-                .join(',')
-        ];
+    const csvRows = [
+        ['Registration','Date','Type','Vendor','Description','DueDate','AmountUSD','AmountIQD','ExchangeRate','Status','ReceiptNumber','Notes','MeasurementNumber','MeasCurrency','MeasUnitType','MeasQuantity','MeasUnitPrice','MeasRetention','MeasTotal']
+        .join(',')
+    ];
         items.forEach(it => {
             csvRows.push([
                 it.registrationNumber,
@@ -425,7 +485,14 @@ class ExpensesManager {
                 it.exchangeRate,
                 it.status,
                 it.purchaseReceiptNumber || '',
-                (it.notes || '').replace(/\n/g,' ')
+        (it.notes || '').replace(/\n/g,' '),
+        it.measurementNumber || '',
+        (it.measDetails && it.measDetails.currency) || '',
+        (it.measDetails && it.measDetails.unitType) || '',
+        (it.measDetails && it.measDetails.quantity) || '',
+        (it.measDetails && it.measDetails.unitPrice) || '',
+        (it.measDetails && it.measDetails.retentionPct) || '',
+        (it.measDetails && it.measDetails.total) || ''
             ].map(v => `"${(v!==undefined && v!==null? v : '').toString().replace(/"/g,'""')}"`).join(','));
         });
         const blob = new Blob([csvRows.join('\n')], {type: 'text/csv;charset=utf-8;'});
@@ -442,25 +509,53 @@ class ExpensesManager {
         if(!this.creditPurchaseType){ alert('اختر نوع القيد أولاً'); return; }
         const vSel = document.getElementById('cpVendorSelect');
         const supplierObj = vSel ? this.getCreditPurchaseSuppliers().find(s=>s.id===vSel.value) : null;
+        const isMeas = this.creditPurchaseType==='measurement';
+        const totalMeas = isMeas ? this.computeMeasurementTotal() : 0;
+        const measCurrency = document.getElementById('cpMeasCurrency')?.value || 'IQD';
         const data = {
             registrationNumber: document.getElementById('cpRegistrationNumber').value,
-            type: this.creditPurchaseType === 'measurement' ? 'ذرعة محتسبة' : 'وصل شراء',
+            type: isMeas ? 'ذرعة محتسبة' : 'وصل شراء',
             vendor: supplierObj ? supplierObj.name : '',
             date: document.getElementById('cpDate').value,
             dueDate: document.getElementById('cpDueDate').value,
             description: document.getElementById('cpDescription').value,
-            amountUSD: document.getElementById('cpAmountUSD').value,
-            amountIQD: document.getElementById('cpAmountIQD').value,
+            amountUSD: isMeas ? (measCurrency==='USD'? totalMeas : 0) : document.getElementById('cpAmountUSD').value,
+            amountIQD: isMeas ? (measCurrency==='IQD'? totalMeas : 0) : document.getElementById('cpAmountIQD').value,
             exchangeRate: document.getElementById('cpExchangeRate').value,
             status: document.getElementById('cpStatus').value,
-            receiptNumber: (this.creditPurchaseType==='purchase_receipt') ? document.getElementById('cpPurchaseReceiptNumber').value : '',
-            notes: document.getElementById('cpNotes').value
+            receiptNumber: (!isMeas) ? document.getElementById('cpPurchaseReceiptNumber').value : (document.getElementById('cpMeasurementNumber')?.value || ''),
+            notes: document.getElementById('cpNotes').value,
+            creditType: this.creditPurchaseType,
+            measCurrency: measCurrency,
+            measUnitType: document.getElementById('cpMeasUnitType')?.value || '',
+            measQuantity: parseFloat(document.getElementById('cpMeasQuantity')?.value)||0,
+            measUnitPrice: parseFloat(document.getElementById('cpMeasUnitPrice')?.value)||0,
+            measRetention: parseFloat(document.getElementById('cpMeasRetention')?.value)||0,
+            measTotal: totalMeas
         };
         const container = document.getElementById('creditPurchasePreviewContent');
         if(container){
             const hasUSD = parseFloat(data.amountUSD) > 0;
             const hasIQD = parseFloat(data.amountIQD) > 0;
             const currencyLabel = hasUSD && hasIQD ? 'معاملة مختلطة (دينار ودولار)' : (hasUSD ? 'بالدولار' : (hasIQD ? 'بالدينار' : 'بدون مبلغ'));
+            const dateLbl = isMeas ? 'تاريخ الاحتساب' : 'التاريخ';
+            const recLbl = 'رقم وصل الشراء/ الذرعة';
+            const measBlock = isMeas ? `
+                <div class="col-12">
+                    <div class="p-2 mt-2" style="background:#f7fbff;border:1px solid #d6e9ff;border-radius:4px;">
+                        <h6 class="mb-2"><i class="bi bi-rulers me-1"></i>تفاصيل الذرعة</h6>
+                        <table class="table table-sm table-borderless mb-0 align-middle" style="direction:rtl;">
+                            <tbody>
+                                <tr><td class="text-end fw-bold" style="width:140px;">العملة:</td><td>${data.measCurrency}</td>
+                                    <td class="text-end fw-bold" style="width:140px;">نوع الوحدة:</td><td>${data.measUnitType || '-'}</td></tr>
+                                <tr><td class="text-end fw-bold">الكمية:</td><td>${data.measQuantity}</td>
+                                    <td class="text-end fw-bold">سعر الوحدة:</td><td>${data.measUnitPrice}</td></tr>
+                                <tr><td class="text-end fw-bold">الحجز (%):</td><td>${data.measRetention}</td>
+                                    <td class="text-end fw-bold">الإجمالي المحتسب:</td><td>${data.measTotal.toFixed ? data.measTotal.toFixed(2) : data.measTotal}</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>` : '';
             container.innerHTML = `
                 <div class="row g-3">
                     <div class="col-md-6">
@@ -468,11 +563,11 @@ class ExpensesManager {
                             <table class="table table-sm table-borderless mb-0 align-middle" style="direction:rtl;">
                                 <tbody>
                                     <tr><td class="text-end fw-bold" style="width:140px;">رقم القيد:</td><td>${data.registrationNumber}</td></tr>
-                                    <tr><td class="text-end fw-bold">التاريخ:</td><td>${data.date || '-'}</td></tr>
+                                    <tr><td class="text-end fw-bold">${dateLbl}:</td><td>${data.date || '-'}</td></tr>
                                     <tr><td class="text-end fw-bold">النوع:</td><td>${data.type}</td></tr>
                                     <tr><td class="text-end fw-bold">الاستحقاق:</td><td>${data.dueDate || '-'}</td></tr>
                                     <tr><td class="text-end fw-bold">المورد:</td><td>${data.vendor || '-'}</td></tr>
-                                    ${data.receiptNumber ? `<tr><td class='text-end fw-bold'>رقم الوصل:</td><td>${data.receiptNumber}</td></tr>` : ''}
+                                    ${data.receiptNumber ? `<tr><td class='text-end fw-bold'>${recLbl}:</td><td>${data.receiptNumber}</td></tr>` : ''}
                                 </tbody>
                             </table>
                         </div>
@@ -490,6 +585,7 @@ class ExpensesManager {
                             </table>
                         </div>
                     </div>
+                    ${measBlock}
                     <div class="col-12">
                         <div class="p-3" style="background:#fff;border:1px solid #eee;border-radius:4px;">
                             <div class="mb-2"><span class="fw-bold">الوصف:</span> ${data.description || '-'}</div>
@@ -510,20 +606,29 @@ class ExpensesManager {
         if(!this.creditPurchaseType){ alert('اختر نوع القيد أولاً'); return; }
         const vSel2 = document.getElementById('cpVendorSelect');
         const supplierObj2 = vSel2 ? this.getCreditPurchaseSuppliers().find(s=>s.id===vSel2.value) : null;
+        const isMeas2 = this.creditPurchaseType==='measurement';
+        const totalMeas2 = isMeas2 ? this.computeMeasurementTotal() : 0;
+        const measCurrency2 = document.getElementById('cpMeasCurrency')?.value || 'IQD';
         const data = {
             registrationNumber: document.getElementById('cpRegistrationNumber').value,
-            type: this.creditPurchaseType === 'measurement' ? 'ذرعة محتسبة' : 'وصل شراء',
+            type: isMeas2 ? 'ذرعة محتسبة' : 'وصل شراء',
             vendor: supplierObj2 ? supplierObj2.name : '',
             date: document.getElementById('cpDate').value,
             dueDate: document.getElementById('cpDueDate').value,
             description: document.getElementById('cpDescription').value,
-            amountUSD: document.getElementById('cpAmountUSD').value,
-            amountIQD: document.getElementById('cpAmountIQD').value,
+            amountUSD: isMeas2 ? (measCurrency2==='USD'? totalMeas2 : 0) : document.getElementById('cpAmountUSD').value,
+            amountIQD: isMeas2 ? (measCurrency2==='IQD'? totalMeas2 : 0) : document.getElementById('cpAmountIQD').value,
             exchangeRate: document.getElementById('cpExchangeRate').value,
             status: document.getElementById('cpStatus').value,
-            receiptNumber: (this.creditPurchaseType==='purchase_receipt') ? document.getElementById('cpPurchaseReceiptNumber').value : '',
+            receiptNumber: (!isMeas2) ? document.getElementById('cpPurchaseReceiptNumber').value : (document.getElementById('cpMeasurementNumber')?.value || ''),
             notes: document.getElementById('cpNotes').value,
-            creditType: this.creditPurchaseType
+            creditType: this.creditPurchaseType,
+            measCurrency: measCurrency2,
+            measUnitType: document.getElementById('cpMeasUnitType')?.value || '',
+            measQuantity: parseFloat(document.getElementById('cpMeasQuantity')?.value)||0,
+            measUnitPrice: parseFloat(document.getElementById('cpMeasUnitPrice')?.value)||0,
+            measRetention: parseFloat(document.getElementById('cpMeasRetention')?.value)||0,
+            measTotal: totalMeas2
         };
         const html = this.generateCreditPurchaseInvoiceHTML(data);
         const win = window.open('', '_blank');
@@ -617,13 +722,15 @@ class ExpensesManager {
 
     // دالة مساعدة: توليد HTML للفوترة بتنسيق احترافي مشابه للصورة
     generateCreditPurchaseInvoiceHTML(data){
-        const hasUSD = parseFloat(data.amountUSD) > 0;
+    const hasUSD = parseFloat(data.amountUSD) > 0;
         const hasIQD = parseFloat(data.amountIQD) > 0;
         const currencyLabel = hasUSD && hasIQD ? 'معاملة مختلطة (دينار ودولار)' : (hasUSD ? 'بالدولار' : (hasIQD ? 'بالدينار' : 'بدون مبلغ')); 
         const fmtUSD = hasUSD ? this.formatCurrency(parseFloat(data.amountUSD)||0,'USD') : '-';
         const fmtIQD = hasIQD ? this.formatCurrency(parseFloat(data.amountIQD)||0,'IQD') : '-';
         const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('فــاتــورة شــراء بالآجــل') : '';
         const footer = (typeof buildPrintFooterHTML === 'function') ? buildPrintFooterHTML() : '';
+    const dateLbl = (data.creditType==='measurement') ? 'تاريخ الاحتساب' : 'التاريخ';
+    const recLbl = 'رقم وصل الشراء/ الذرعة';
         return `<!DOCTYPE html><html lang='ar'>
         <head>
             <meta charset='UTF-8'>
@@ -656,13 +763,13 @@ class ExpensesManager {
               <table class='invoice-table'>
                 <tr>
                     <td class='label-cell'>رقم القيد</td><td>${data.registrationNumber}</td>
-                    <td class='label-cell'>التاريخ</td><td>${data.date || '-'}</td>
+                    <td class='label-cell'>${dateLbl}</td><td>${data.date || '-'}</td>
                     <td class='label-cell'>الاستحقاق</td><td>${data.dueDate || '-'}</td>
                 </tr>
                 <tr>
                     <td class='label-cell'>البيان</td><td>${data.description || '-'}</td>
                     <td class='label-cell'>المورد</td><td>${data.vendor || '-'}</td>
-                    <td class='label-cell'>رقم الوصل</td><td>${data.receiptNumber || '-'}</td>
+                    <td class='label-cell'>${recLbl}</td><td>${data.receiptNumber || '-'}</td>
                 </tr>
                 <tr>
                     <td class='label-cell'>المبلغ بالدينار</td><td class='money-iqd'>${fmtIQD}</td>
@@ -674,6 +781,17 @@ class ExpensesManager {
                     <td class='label-cell'>نوع القيد</td><td>${data.type}</td>
                     <td class='label-cell'>تصنيف العملة</td><td>${currencyLabel}</td>
                 </tr>
+                ${(data.creditType==='measurement') ? `
+                <tr>
+                    <td class='label-cell'>العملة</td><td>${data.measCurrency || '-'}</td>
+                    <td class='label-cell'>نوع الوحدة</td><td>${data.measUnitType || '-'}</td>
+                    <td class='label-cell'>الإجمالي المحتسب</td><td>${(data.measTotal||0).toFixed ? (data.measTotal||0).toFixed(2) : (data.measTotal||0)}</td>
+                </tr>
+                <tr>
+                    <td class='label-cell'>الكمية</td><td>${data.measQuantity || 0}</td>
+                    <td class='label-cell'>سعر الوحدة</td><td>${data.measUnitPrice || 0}</td>
+                    <td class='label-cell'>الحجز (%)</td><td>${data.measRetention || 0}</td>
+                </tr>` : ''}
               </table>
               <div style='margin-top:12px;font-size:13px;font-weight:600;'>الملاحظات</div>
               <div class='notes-box'>${data.notes ? data.notes.replace(/\n/g,'<br>') : '—'}</div>
@@ -695,12 +813,14 @@ class ExpensesManager {
             <script>
             (function(){
                try {
-                   // بناء حمولة مختصرة: CP|رقم|تاريخ|USD|IQD
-                   var payload = 'CP|'+
-                      '${data.registrationNumber}'+'|'+
-                      '${data.date || ''}'+'|'+
-                      '${data.amountUSD || 0}'+'|'+
-                      '${data.amountIQD || 0}';
+                         // حمولة أوسع: CP|نوع|رقم|تاريخ|مورد|USD|IQD
+                         var payload = 'CP|' +
+                             '${data.creditType || ''}'+'|' +
+                             '${data.registrationNumber}'+'|' +
+                             '${data.date || ''}'+'|' +
+                             '${(data.vendor||'').replace(/\|/g,' ')}'+'|' +
+                             '${data.amountUSD || 0}'+'|' +
+                             '${data.amountIQD || 0}';
                    var box = document.getElementById('invoiceQRBox');
                    var script = document.createElement('script');
                    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
