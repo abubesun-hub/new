@@ -305,6 +305,10 @@ class ExpensesManager {
             const isMeas = this.creditPurchaseType === 'measurement';
             const measCurrency = document.getElementById('cpMeasCurrency')?.value || 'IQD';
             const totalMeas = isMeas ? this.computeMeasurementTotal() : 0;
+            // Compute retention numerically to avoid localized input parsing
+            const _g = (parseFloat(document.getElementById('cpMeasQuantity')?.value)||0) * (parseFloat(document.getElementById('cpMeasUnitPrice')?.value)||0);
+            const _rp = Math.min(100, Math.max(0, parseFloat(document.getElementById('cpMeasRetention')?.value)||0));
+            const _ra = _g * _rp / 100;
             const entry = {
                 type: 'credit_purchase',
                 creditType: this.creditPurchaseType,
@@ -324,8 +328,8 @@ class ExpensesManager {
                     unitType: document.getElementById('cpMeasUnitType')?.value || '',
                     quantity: parseFloat(document.getElementById('cpMeasQuantity')?.value)||0,
                     unitPrice: parseFloat(document.getElementById('cpMeasUnitPrice')?.value)||0,
-                    retentionPct: parseFloat(document.getElementById('cpMeasRetention')?.value)||0,
-                    retentionAmount: parseFloat(document.getElementById('cpMeasRetentionAmount')?.value)||0,
+                    retentionPct: Math.min(100, Math.max(0, parseFloat(document.getElementById('cpMeasRetention')?.value)||0)),
+                    retentionAmount: _ra,
                     total: totalMeas
                 } : null,
                 status: document.getElementById('cpStatus').value,
@@ -418,9 +422,23 @@ class ExpensesManager {
         const retAmount = gross * ret/100;
         const total = gross - retAmount;
         const out = document.getElementById('cpMeasTotal');
-        if(out){ out.value = total.toFixed(2); }
+        // Localize formatting inside the read-only inputs according to selected currency
+        const cur = document.getElementById('cpMeasCurrency')?.value || 'IQD';
+        if(out){
+            if(cur === 'USD'){
+                out.value = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(total);
+            } else {
+                out.value = new Intl.NumberFormat('ar-IQ', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(total);
+            }
+        }
         const retOut = document.getElementById('cpMeasRetentionAmount');
-        if(retOut){ retOut.value = retAmount.toFixed(2); }
+        if(retOut){
+            if(cur === 'USD'){
+                retOut.value = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(retAmount);
+            } else {
+                retOut.value = new Intl.NumberFormat('ar-IQ', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(retAmount);
+            }
+        }
         // keep currency suffixes in sync
         this.updateMeasurementCurrencySuffix();
         return total;
@@ -560,6 +578,17 @@ class ExpensesManager {
             const currencyLabel = hasUSD && hasIQD ? 'معاملة مختلطة (دينار ودولار)' : (hasUSD ? 'بالدولار' : (hasIQD ? 'بالدينار' : 'بدون مبلغ'));
             const dateLbl = isMeas ? 'تاريخ الاحتساب' : 'التاريخ';
             const recLbl = 'رقم وصل الشراء/ الذرعة';
+            // Ensure retentionAmount is numeric and not taken from localized string
+            const _qty = parseFloat(document.getElementById('cpMeasQuantity')?.value)||0;
+            const _price = parseFloat(document.getElementById('cpMeasUnitPrice')?.value)||0;
+            const _retPct = Math.min(100, Math.max(0, parseFloat(document.getElementById('cpMeasRetention')?.value)||0));
+            const _gross = _qty * _price;
+            const _retAmount = _gross * _retPct / 100;
+            data.measRetentionAmount = _retAmount;
+            // Pre-format measurement numbers for display using selected currency
+            const measCur = data.measCurrency || 'IQD';
+            const measTotalFormatted = this.formatCurrency(data.measTotal || 0, measCur);
+            const measRetFormatted = this.formatCurrency(data.measRetentionAmount || 0, measCur);
             const measBlock = isMeas ? `
                 <div class="col-12">
                     <div class="p-2 mt-2" style="background:#f7fbff;border:1px solid #d6e9ff;border-radius:4px;">
@@ -571,8 +600,8 @@ class ExpensesManager {
                                 <tr><td class="text-end fw-bold">الكمية:</td><td>${data.measQuantity}</td>
                                     <td class="text-end fw-bold">سعر الوحدة:</td><td>${data.measUnitPrice}</td></tr>
                                 <tr><td class="text-end fw-bold">الحجز (%):</td><td>${data.measRetention}</td>
-                                    <td class="text-end fw-bold">مبلغ الحجز:</td><td>${(data.measRetentionAmount||0).toFixed ? (data.measRetentionAmount||0).toFixed(2) : (data.measRetentionAmount||0)}</td></tr>
-                                <tr><td class="text-end fw-bold">الإجمالي المحتسب:</td><td>${data.measTotal.toFixed ? data.measTotal.toFixed(2) : data.measTotal}</td>
+                                    <td class="text-end fw-bold">مبلغ الحجز:</td><td>${measRetFormatted}</td></tr>
+                                <tr><td class="text-end fw-bold">الإجمالي المحتسب:</td><td>${measTotalFormatted}</td>
                                     <td></td><td></td></tr>
                             </tbody>
                         </table>
@@ -814,7 +843,7 @@ class ExpensesManager {
                 <tr>
                     <td class='label-cell'>العملة</td><td>${data.measCurrency || '-'}</td>
                     <td class='label-cell'>نوع الوحدة</td><td>${data.measUnitType || '-'}</td>
-                    <td class='label-cell'>الإجمالي المحتسب</td><td>${(data.measTotal||0).toFixed ? (data.measTotal||0).toFixed(2) : (data.measTotal||0)}</td>
+                    <td class='label-cell'>الإجمالي المحتسب</td><td>${this.formatCurrency(data.measTotal || 0, data.measCurrency || 'IQD')}</td>
                 </tr>
                 <tr>
                     <td class='label-cell'>الكمية</td><td>${data.measQuantity || 0}</td>
@@ -822,7 +851,7 @@ class ExpensesManager {
                     <td class='label-cell'>الحجز (%)</td><td>${data.measRetention || 0}</td>
                 </tr>
                 <tr>
-                    <td class='label-cell'>مبلغ الحجز</td><td colspan='5'>${(data.measRetentionAmount||0).toFixed ? (data.measRetentionAmount||0).toFixed(2) : (data.measRetentionAmount||0)}</td>
+                    <td class='label-cell'>مبلغ الحجز</td><td colspan='5'>${this.formatCurrency(data.measRetentionAmount || 0, data.measCurrency || 'IQD')}</td>
                 </tr>` : ''}
               </table>
               <div style='margin-top:12px;font-size:13px;font-weight:600;'>الملاحظات</div>
@@ -2114,15 +2143,29 @@ class ExpensesManager {
 
     // Utility functions
     formatCurrency(amount, currency) {
-        const num = parseFloat(amount) || 0;
-        if (currency === 'USD') {
-            return new Intl.NumberFormat('en-US', {
-                style: 'currency',
-                currency: 'USD'
-            }).format(num);
-        } else {
-            return new Intl.NumberFormat('ar-IQ').format(num) + ' د.ع';
+        // Normalize inputs
+        const num = Number(amount) || 0;
+        const curr = (currency || 'IQD').toString().toUpperCase();
+
+        // USD: Western digits, 2 decimals, suffix in Arabic
+        if (curr === 'USD' || curr === '$') {
+            const abs = Math.abs(num);
+            const formatted = new Intl.NumberFormat('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+                useGrouping: true
+            }).format(abs);
+            return (num < 0 ? '-' : '') + formatted + ' دولار';
         }
+
+        // IQD (default): Arabic digits, Arabic thousands separator, no decimals, suffix د.ع
+        const abs = Math.abs(num);
+        const formatted = new Intl.NumberFormat('ar-IQ', {
+            useGrouping: true,
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }).format(abs);
+        return (num < 0 ? '-' : '') + formatted + ' د.ع';
     }
 
     formatDate(dateString) {
