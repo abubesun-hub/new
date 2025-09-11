@@ -9,6 +9,14 @@ class ExpensesManager {
     this.creditPurchaseType = null;
     this.creditPurchaseSubView = null; // (suppliers | add | settlements)
     this.editingCreditPurchaseSupplierId = null; // حالة تعديل مورد
+    // إدارة قيود الشراء بالآجل
+    this.editingCreditPurchaseId = null; // عند التعديل
+    this.cpSearchQuery = '';
+    // فلاتر سجل الشراء بالآجل المتقدمة
+    this.cpFilters = { vendorId: '', type: '', dateFrom: '', dateTo: '', dueFrom: '', dueTo: '', reg: '' };
+    // للتراجع بعد الحذف
+    this._lastDeletedCreditPurchase = null;
+    this._cpUndoTimer = null;
         this.init();
     }
 
@@ -336,13 +344,112 @@ class ExpensesManager {
                 notes: document.getElementById('cpNotes').value.trim(),
                 createdAt: new Date().toISOString()
             };
-            list.push(entry);
+            // إذا كنا في وضع تعديل سجل موجود، حدثه بدلاً من الإضافة
+            if(this.editingCreditPurchaseId){
+                const idx = list.findIndex(x => x.registrationNumber === this.editingCreditPurchaseId);
+                if(idx > -1){ list[idx] = { ...list[idx], ...entry, registrationNumber: this.editingCreditPurchaseId, updatedAt: new Date().toISOString() }; }
+            } else {
+                list.push(entry);
+            }
             StorageManager.saveData(StorageManager.STORAGE_KEYS.CREDIT_PURCHASES, list);
             this.renderCreditPurchasesTable();
             form.reset();
             // regenerate number for next entry
             document.getElementById('cpRegistrationNumber').value = 'CP-' + Date.now().toString().slice(-6);
+            this.editingCreditPurchaseId = null;
+            this.creditPurchaseType = null;
         });
+    }
+
+    // طباعة سجل موجود من القائمة
+    printExistingCreditPurchase(regNo){
+    // تأكيد قبل الطباعة
+    if(!confirm('تأكيد الطباعة؟')) return;
+        const all = StorageManager.getData(StorageManager.STORAGE_KEYS.CREDIT_PURCHASES) || [];
+        const it = all.find(x => x.registrationNumber === regNo);
+        if(!it) return;
+        // جهز نفس بنية البيانات المستخدمة في الطباعة الحالية
+        const isMeas = it.creditType === 'measurement';
+        const data = {
+            registrationNumber: it.registrationNumber,
+            date: new Date(it.date).toLocaleDateString('ar-IQ'),
+            dueDate: it.dueDate ? new Date(it.dueDate).toLocaleDateString('ar-IQ') : '-',
+            description: it.description,
+            vendor: it.vendor,
+            type: isMeas ? 'ذرعة محتسبة' : 'وصل شراء',
+            status: it.status || 'open',
+            amountUSD: it.amountUSD || 0,
+            amountIQD: it.amountIQD || 0,
+            exchangeRate: it.exchangeRate || 0,
+            receiptNumber: isMeas ? (it.measurementNumber || '-') : (it.purchaseReceiptNumber || '-'),
+            creditType: it.creditType,
+            measCurrency: it.measDetails?.currency,
+            measUnitType: it.measDetails?.unitType,
+            measQuantity: it.measDetails?.quantity,
+            measUnitPrice: it.measDetails?.unitPrice,
+            measRetention: it.measDetails?.retentionPct,
+            measRetentionAmount: it.measDetails?.retentionAmount,
+            measTotal: it.measDetails?.total,
+            notes: it.notes
+        };
+        const html = this.generateCreditPurchaseInvoiceHTML(data);
+        const w = window.open('', '_blank');
+        w.document.write(html);
+        w.document.close();
+        setTimeout(()=>{ w.focus(); w.print(); }, 300);
+    }
+
+    // تحرير سجل: تعبئة النموذج بالقيم وإتاحة الحفظ كتحديث
+    editCreditPurchase(regNo){
+        const all = StorageManager.getData(StorageManager.STORAGE_KEYS.CREDIT_PURCHASES) || [];
+        const it = all.find(x => x.registrationNumber === regNo);
+        if(!it) return;
+        // انتقل لشاشة الإضافة لضبط الحقول
+        this.loadCreditPurchaseView('add');
+        // اختر النوع
+        this.selectCreditPurchaseType(it.creditType === 'measurement' ? 'measurement' : 'purchase_receipt');
+        this.editingCreditPurchaseId = regNo;
+        // املأ الحقول
+        document.getElementById('cpRegistrationNumber').value = regNo;
+        document.getElementById('cpDate').value = it.date ? it.date.split('T')[0] || it.date : '';
+        // المورد بالاسم فقط حالياً (لدينا vendorId إن وجد)
+        const vendorSel = document.getElementById('cpVendorSelect');
+        if(vendorSel){ vendorSel.disabled = false; if(it.vendorId){ vendorSel.value = it.vendorId; } }
+        document.getElementById('cpDescription').value = it.description || '';
+        document.getElementById('cpDueDate').value = it.dueDate ? it.dueDate.split('T')[0] || it.dueDate : '';
+        document.getElementById('cpStatus').value = it.status || 'open';
+        document.getElementById('cpNotes').value = it.notes || '';
+        if(it.creditType === 'measurement'){
+            document.getElementById('cpMeasurementNumber').value = it.measurementNumber || '';
+            document.getElementById('cpMeasCurrency').value = it.measDetails?.currency || 'IQD';
+            ['cpMeasCurrency','cpMeasUnitType','cpMeasQuantity','cpMeasUnitPrice','cpMeasRetention'].forEach(id=>{ const el=document.getElementById(id); if(el) el.disabled=false; });
+            document.getElementById('cpMeasUnitType').value = it.measDetails?.unitType || 'م2';
+            document.getElementById('cpMeasQuantity').value = it.measDetails?.quantity ?? 0;
+            document.getElementById('cpMeasUnitPrice').value = it.measDetails?.unitPrice ?? 0;
+            document.getElementById('cpMeasRetention').value = it.measDetails?.retentionPct ?? 0;
+            this.computeMeasurementTotal();
+        } else {
+            document.getElementById('cpPurchaseReceiptNumber').value = it.purchaseReceiptNumber || '';
+            document.getElementById('cpAmountUSD').value = it.amountUSD || 0;
+            document.getElementById('cpAmountIQD').value = it.amountIQD || 0;
+            document.getElementById('cpExchangeRate').value = it.exchangeRate || 0;
+        }
+        // تفعيل الحفظ والمعاينة والطباعة
+        ['cpSubmitBtn','cpPreviewBtn','cpPrintBtn','cpResetBtn'].forEach(id=>{ const el=document.getElementById(id); if(el) el.disabled=false; });
+    }
+
+    // حذف سجل
+    deleteCreditPurchase(regNo){
+        if(!confirm('هل تريد حذف هذا السجل؟')) return;
+    const all = StorageManager.getData(StorageManager.STORAGE_KEYS.CREDIT_PURCHASES) || [];
+    const found = all.find(x => x.registrationNumber === regNo) || null;
+    const next = all.filter(x => x.registrationNumber !== regNo);
+        StorageManager.saveData(StorageManager.STORAGE_KEYS.CREDIT_PURCHASES, next);
+    // خزّن آخر محذوف لإتاحة التراجع
+    this._lastDeletedCreditPurchase = found;
+        this.renderCreditPurchasesTable();
+    // أظهر شريط التراجع
+    if(found){ this.showCreditPurchaseUndoBar(`تم حذف القيد ${found.registrationNumber}`); }
     }
 
     // تفعيل الحقول حسب اختيار النوع
@@ -457,12 +564,145 @@ class ExpensesManager {
         const container = document.getElementById('creditPurchasesList');
         if (!container) return;
         const data = StorageManager.getAllData();
-        const items = (data.creditPurchases || []).slice().sort((a,b) => new Date(b.date) - new Date(a.date));
-        if (items.length === 0) {
-            container.innerHTML = '<p class="text-muted text-center">لا توجد عمليات شراء بالآجل مسجلة</p>';
+        const all = (data.creditPurchases || []).slice().sort((a,b) => new Date(b.date) - new Date(a.date));
+
+        // واجهة الفلاتر المتقدمة + منطقة التراجع
+        const suppliers = this.getCreditPurchaseSuppliers();
+        const vendorOptions = ['<option value="">الكل</option>'].concat(
+            suppliers.map(s=>`<option value="${s.id}">${s.name}</option>`) 
+        ).join('');
+
+        container.innerHTML = `
+            <div id="cpUndoBar" class="alert alert-warning py-2 px-3" style="display:none"></div>
+            <div class="row g-2 mb-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label small"><i class="bi bi-upc-scan me-1"></i>رقم القيد (يدعم الباركود)</label>
+                    <input type="text" id="cpFReg" class="form-control form-control-sm" placeholder="أدخل/امسح الباركود" value="${this.cpFilters.reg||''}" oninput="expensesManager.onCPFiltersChange('reg', this.value)">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small"><i class="bi bi-building me-1"></i>المورد</label>
+                    <select id="cpFVendor" class="form-control form-control-sm" onchange="expensesManager.onCPFiltersChange('vendorId', this.value)">${vendorOptions}</select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small"><i class="bi bi-list-check me-1"></i>نوع القيد</label>
+                    <select id="cpFType" class="form-control form-control-sm" onchange="expensesManager.onCPFiltersChange('type', this.value)">
+                        <option value="">الكل</option>
+                        <option value="purchase_receipt">وصل شراء</option>
+                        <option value="measurement">ذرعة محتسبة</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small"><i class="bi bi-calendar me-1"></i>من تاريخ الشراء</label>
+                    <input type="date" id="cpFDateFrom" class="form-control form-control-sm" value="${this.cpFilters.dateFrom||''}" oninput="expensesManager.onCPFiltersChange('dateFrom', this.value)">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small"><i class="bi bi-calendar me-1"></i>إلى تاريخ الشراء</label>
+                    <input type="date" id="cpFDateTo" class="form-control form-control-sm" value="${this.cpFilters.dateTo||''}" oninput="expensesManager.onCPFiltersChange('dateTo', this.value)">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small"><i class="bi bi-calendar-event me-1"></i>من الاستحقاق</label>
+                    <input type="date" id="cpFDueFrom" class="form-control form-control-sm" value="${this.cpFilters.dueFrom||''}" oninput="expensesManager.onCPFiltersChange('dueFrom', this.value)">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small"><i class="bi bi-calendar-event me-1"></i>إلى الاستحقاق</label>
+                    <input type="date" id="cpFDueTo" class="form-control form-control-sm" value="${this.cpFilters.dueTo||''}" oninput="expensesManager.onCPFiltersChange('dueTo', this.value)">
+                </div>
+                <div class="col-md-2 d-grid">
+                    <button class="btn btn-sm btn-secondary" onclick="expensesManager.resetCPFilters()"><i class="bi bi-arrow-counterclockwise me-1"></i>إعادة</button>
+                </div>
+                <div class="col text-end align-self-center small text-muted">
+                    <span id="cpCountBadge"></span>
+                </div>
+            </div>
+            <table class="table table-sm table-striped align-middle">
+                <thead>
+                    <tr>
+                        <th>القيد</th><th>التاريخ/الاحتساب</th><th>النوع</th><th>المورد</th><th>الوصف</th><th>الاستحقاق</th><th>دولار</th><th>دينار</th><th>الحالة</th><th>رقم وصل الشراء/ الذرعة</th><th>إجراءات</th>
+                    </tr>
+                </thead>
+                <tbody id="cpTableBody"></tbody>
+            </table>`;
+
+        // اضبط قيم القوائم بعد الحقن
+        const vSel = document.getElementById('cpFVendor'); if(vSel) vSel.value = this.cpFilters.vendorId || '';
+        const tSel = document.getElementById('cpFType'); if(tSel) tSel.value = this.cpFilters.type || '';
+
+        // ارسم الصفوف فقط (لمنع فقدان الإدخال أثناء الكتابة)
+        this.renderCreditPurchasesRows(all);
+    }
+
+    onCreditPurchasesSearch(value){
+        this.cpSearchQuery = value;
+        // لم تعد تستخدم للبحث المباشر، لكن يمكن الحفاظ عليها كبحث نصي إضافي لاحقاً
+        const data = StorageManager.getAllData();
+        const all = (data.creditPurchases || []).slice().sort((a,b) => new Date(b.date) - new Date(a.date));
+        this.renderCreditPurchasesRows(all);
+    }
+
+    // تطبيق فلاتر متقدمة
+    onCPFiltersChange(key, value){
+        this.cpFilters[key] = value;
+        const data = StorageManager.getAllData();
+        const all = (data.creditPurchases || []).slice().sort((a,b) => new Date(b.date) - new Date(a.date));
+        this.renderCreditPurchasesRows(all);
+    }
+
+    resetCPFilters(){
+        this.cpFilters = { vendorId: '', type: '', dateFrom: '', dateTo: '', dueFrom: '', dueTo: '', reg: '' };
+        const data = StorageManager.getAllData();
+        const all = (data.creditPurchases || []).slice().sort((a,b) => new Date(b.date) - new Date(a.date));
+        this.renderCreditPurchasesRows(all);
+        // تحديث واجهة الحقول
+        ['cpFReg','cpFDateFrom','cpFDateTo','cpFDueFrom','cpFDueTo'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+        const vSel = document.getElementById('cpFVendor'); if(vSel) vSel.value='';
+        const tSel = document.getElementById('cpFType'); if(tSel) tSel.value='';
+    }
+
+    getFilteredCreditPurchases(list){
+        const f = this.cpFilters || {};
+        const txt = (this.cpSearchQuery || '').trim().toLowerCase();
+        const toDate = (v)=> v ? new Date(v) : null;
+        const df = toDate(f.dateFrom), dt = toDate(f.dateTo), duf = toDate(f.dueFrom), dut = toDate(f.dueTo);
+        const norm = (s)=> (s||'').toString().toLowerCase();
+        return (list||[]).filter(it => {
+            // vendor
+            if(f.vendorId && (it.vendorId || '') !== f.vendorId) return false;
+            // type
+            if(f.type && (it.creditType || '') !== f.type) return false;
+            // purchase date range
+            const d = new Date(it.date);
+            if(df && d < df) return false;
+            if(dt && d > dt) return false;
+            // due date range
+            if(duf || dut){
+                if(!it.dueDate) return false;
+                const dd = new Date(it.dueDate);
+                if(duf && dd < duf) return false;
+                if(dut && dd > dut) return false;
+            }
+            // registration number (supports barcode scan - usually typed fast then Enter)
+            if(f.reg){ if(!norm(it.registrationNumber).startsWith(norm(f.reg))) return false; }
+            // free text query (legacy single box)
+            if(txt){
+                const hay = [it.registrationNumber, it.vendor, it.description, it.creditType, it.purchaseReceiptNumber, it.measurementNumber]
+                    .map(norm).join(' ');
+                if(!hay.includes(txt)) return false;
+            }
+            return true;
+        });
+    }
+
+    renderCreditPurchasesRows(all){
+        const body = document.getElementById('cpTableBody');
+        const countBadge = document.getElementById('cpCountBadge');
+        const items = this.getFilteredCreditPurchases(all).sort((a,b)=> new Date(b.date) - new Date(a.date));
+        if(!body){ return; }
+        if(items.length===0){
+            body.innerHTML = `<tr><td colspan="11" class="text-center text-muted py-3"><i class="bi bi-inbox"></i> لا توجد قيود مطابقة</td></tr>`;
+            if(countBadge) countBadge.textContent = `0 / ${all.length} سجل`;
             return;
         }
-        const rows = items.map(it => `
+        body.innerHTML = items.map(it => `
             <tr>
                 <td>${it.registrationNumber}</td>
                 <td>${new Date(it.date).toLocaleDateString('ar-IQ')}</td>
@@ -473,28 +713,41 @@ class ExpensesManager {
                 <td>${this.formatCurrency(it.amountUSD, 'USD')}</td>
                 <td>${this.formatCurrency(it.amountIQD, 'IQD')}</td>
                 <td>${it.status}</td>
+                <td>${it.creditType==='measurement' ? (it.measurementNumber || '-') : (it.purchaseReceiptNumber || '-')}</td>
+                <td class="text-nowrap">
+                    <button class="btn btn-sm btn-warning me-1" title="طباعة" onclick="expensesManager.printExistingCreditPurchase('${it.registrationNumber}')"><i class="bi bi-printer"></i></button>
+                    <button class="btn btn-sm btn-primary me-1" title="تعديل" onclick="expensesManager.editCreditPurchase('${it.registrationNumber}')"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-sm btn-danger" title="حذف" onclick="expensesManager.deleteCreditPurchase('${it.registrationNumber}')"><i class="bi bi-trash"></i></button>
+                </td>
             </tr>`).join('');
-        container.innerHTML = `
-            <table class="table table-sm table-striped align-middle">
-                <thead>
-                    <tr>
-                        <th>القيد</th><th>التاريخ/الاحتساب</th><th>النوع</th><th>المورد</th><th>الوصف</th><th>الاستحقاق</th><th>دولار</th><th>دينار</th><th>الحالة</th><th>رقم وصل الشراء/ الذرعة</th>
-                    </tr>
-                </thead>
-                <tbody>${items.map(it => `
-                    <tr>
-                        <td>${it.registrationNumber}</td>
-                        <td>${new Date(it.date).toLocaleDateString('ar-IQ')}</td>
-                        <td>${it.creditType === 'measurement' ? 'ذرعة' : 'وصل شراء'}</td>
-                        <td>${it.vendor || '-'}</td>
-                        <td>${it.description || '-'}</td>
-                        <td>${it.dueDate ? new Date(it.dueDate).toLocaleDateString('ar-IQ') : '-'}</td>
-                        <td>${this.formatCurrency(it.amountUSD, 'USD')}</td>
-                        <td>${this.formatCurrency(it.amountIQD, 'IQD')}</td>
-                        <td>${it.status}</td>
-                        <td>${it.creditType==='measurement' ? (it.measurementNumber || '-') : (it.purchaseReceiptNumber || '-')}</td>
-                    </tr>`).join('')}</tbody>
-            </table>`;
+        if(countBadge) countBadge.textContent = `${items.length} / ${all.length} سجل`;
+    }
+
+    // شريط تراجع بعد الحذف
+    showCreditPurchaseUndoBar(message){
+        const bar = document.getElementById('cpUndoBar');
+        if(!bar) return;
+        bar.innerHTML = `${message} <button class="btn btn-sm btn-outline-dark ms-2" onclick="expensesManager.undoDeleteCreditPurchase()"><i class="bi bi-arrow-90deg-left"></i> تراجع</button>`;
+        bar.style.display = 'block';
+        clearTimeout(this._cpUndoTimer);
+        this._cpUndoTimer = setTimeout(()=>{ this.hideCreditPurchaseUndoBar(); }, 8000);
+    }
+    hideCreditPurchaseUndoBar(){
+        const bar = document.getElementById('cpUndoBar');
+        if(bar){ bar.style.display='none'; bar.innerHTML=''; }
+        clearTimeout(this._cpUndoTimer); this._cpUndoTimer = null;
+    }
+    undoDeleteCreditPurchase(){
+        if(!this._lastDeletedCreditPurchase) { this.hideCreditPurchaseUndoBar(); return; }
+        const all = StorageManager.getData(StorageManager.STORAGE_KEYS.CREDIT_PURCHASES) || [];
+        all.push(this._lastDeletedCreditPurchase);
+        StorageManager.saveData(StorageManager.STORAGE_KEYS.CREDIT_PURCHASES, all);
+        this._lastDeletedCreditPurchase = null;
+        this.hideCreditPurchaseUndoBar();
+        // أعد تحميل الصفوف فقط
+        const data = StorageManager.getAllData();
+        const list = (data.creditPurchases || []).slice();
+        this.renderCreditPurchasesRows(list);
     }
 
     exportCreditPurchases() {
@@ -655,6 +908,7 @@ class ExpensesManager {
     printCreditPurchaseInvoice(){
         // جمع البيانات (لا نعتمد فقط على المعاينة حتى لو لم تُضغط زر معاينة)
         if(!this.creditPurchaseType){ alert('اختر نوع القيد أولاً'); return; }
+    if(!confirm('تأكيد الطباعة؟')) return;
         const vSel2 = document.getElementById('cpVendorSelect');
         const supplierObj2 = vSel2 ? this.getCreditPurchaseSuppliers().find(s=>s.id===vSel2.value) : null;
         const isMeas2 = this.creditPurchaseType==='measurement';
