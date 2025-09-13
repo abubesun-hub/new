@@ -671,7 +671,30 @@ class ExpensesManager {
         const bodyHtml = this.generateExpenseReceiptHTML(entry);
         const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('سند صرف - دفعة تسديد آجل') : '';
         const footer = (typeof buildPrintFooterHTML === 'function') ? buildPrintFooterHTML() : '';
-        const html = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>معاينة دفعة - ${entry.registrationNumber}</title><link rel="stylesheet" href="css/style.css"></head><body>${header}<div class="receipt-body">${bodyHtml}</div>${footer}</body></html>`;
+        const html = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>معاينة دفعة - ${entry.registrationNumber}</title><link rel="stylesheet" href="css/style.css">
+        <style>
+            @page { size: A4; margin: 8mm; }
+            @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; font-size: 12px; } }
+            .receipt-container { max-width: 700px !important; padding: 12px !important; border-width: 1px !important; margin: 0 auto !important; }
+            .header { margin-bottom: 8px !important; padding-bottom: 8px !important; }
+            .company-name, .receipt-title { display: none !important; }
+            .receipt-body { margin: 12px 0 !important; }
+            .info-row { margin-bottom: 6px !important; padding: 6px !important; }
+            .info-label { min-width: 120px !important; font-size: 12px !important; }
+            .info-value { font-size: 12px !important; }
+            .amount-section { padding: 8px !important; margin: 10px 0 !important; }
+            .amount-label { font-size: 14px !important; }
+            .amount-value { font-size: 20px !important; }
+            .amount-words { font-size: 12px !important; }
+            .description-section { padding: 8px !important; margin: 10px 0 !important; }
+            .signatures { margin-top: 20px !important; }
+            .signature-line { height: 28px !important; }
+            .print-info { display: none !important; }
+            .print-header .print-sub { font-size: 10px !important; margin-bottom: 4px !important; }
+            .print-header .program-name { font-size: 14px !important; }
+            .print-footer { padding: 6px 10px !important; font-size: 11px !important; }
+        </style>
+        </head><body>${header}<div class="receipt-body">${bodyHtml}</div>${footer}</body></html>`;
         const w = window.open('', '_blank', 'width=900,height=700');
         w.document.write(html); w.document.close();
     }
@@ -682,7 +705,30 @@ class ExpensesManager {
         const bodyHtml = this.generateExpenseReceiptHTML(entry);
         const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('سند صرف - دفعة تسديد آجل') : '';
         const footer = (typeof buildPrintFooterHTML === 'function') ? buildPrintFooterHTML() : '';
-        const html = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>طباعة دفعة - ${entry.registrationNumber}</title><link rel="stylesheet" href="css/style.css"></head><body>${header}<div class="receipt-body">${bodyHtml}</div>${footer}</body></html>`;
+        const html = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>طباعة دفعة - ${entry.registrationNumber}</title><link rel="stylesheet" href="css/style.css">
+        <style>
+            @page { size: A4; margin: 8mm; }
+            @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; font-size: 12px; } }
+            .receipt-container { max-width: 700px !important; padding: 12px !important; border-width: 1px !important; margin: 0 auto !important; }
+            .header { margin-bottom: 8px !important; padding-bottom: 8px !important; }
+            .company-name, .receipt-title { display: none !important; }
+            .receipt-body { margin: 12px 0 !important; }
+            .info-row { margin-bottom: 6px !important; padding: 6px !important; }
+            .info-label { min-width: 120px !important; font-size: 12px !important; }
+            .info-value { font-size: 12px !important; }
+            .amount-section { padding: 8px !important; margin: 10px 0 !important; }
+            .amount-label { font-size: 14px !important; }
+            .amount-value { font-size: 20px !important; }
+            .amount-words { font-size: 12px !important; }
+            .description-section { padding: 8px !important; margin: 10px 0 !important; }
+            .signatures { margin-top: 20px !important; }
+            .signature-line { height: 28px !important; }
+            .print-info { display: none !important; }
+            .print-header .print-sub { font-size: 10px !important; margin-bottom: 4px !important; }
+            .print-header .program-name { font-size: 14px !important; }
+            .print-footer { padding: 6px 10px !important; font-size: 11px !important; }
+        </style>
+        </head><body>${header}<div class="receipt-body">${bodyHtml}</div>${footer}</body></html>`;
         const win = window.open('', '_blank', 'width=900,height=700');
         win.document.write(html); win.document.close();
         win.onload = () => setTimeout(()=>{ try { win.print(); } catch(_){} }, 300);
