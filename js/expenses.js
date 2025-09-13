@@ -293,6 +293,7 @@ class ExpensesManager {
                                     <tr>
                                         <th>القيد</th>
                                         <th>المورد</th>
+                                        <th>وصف الشراء</th>
                                         <th>التاريخ</th>
                                         <th>إجمالي $</th>
                                         <th>مسدد $</th>
@@ -373,6 +374,34 @@ class ExpensesManager {
                                     <label class="form-label small">رقم مرجع/وصل</label>
                                     <input type="text" id="cpSettlRef" class="form-control form-control-sm" placeholder="اختياري">
                                 </div>
+                                <!-- الحقول المطلوبة لتطابق قيد المصروف -->
+                                <div class="col-md-6">
+                                    <label class="form-label small">رقم الوصل</label>
+                                    <input type="text" id="cpSettlReceiptNo" class="form-control form-control-sm" placeholder="رقم الوصل (اختياري)">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">الدليل المحاسبي</label>
+                                    <select id="cpSettlAccGuide" class="form-select form-select-sm">
+                                        <option value="">اختر من الدليل المحاسبي</option>
+                                        ${this.getAccountingGuideOptions()}
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">فئة المصروف</label>
+                                    <select id="cpSettlCategory" class="form-select form-select-sm">
+                                        ${['<option value="">اختر الفئة</option>'].concat(this.getExpenseCategories().map(c=>`<option value="${c}" ${c==='تسديد مشتريات آجل'?'selected':''}>${c}</option>`)).join('')}
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">المشروع</label>
+                                    <select id="cpSettlProject" class="form-select form-select-sm">
+                                        <option value="">اختر المشروع</option>
+                                        <option value="مشروع 1">مشروع البناء الرئيسي</option>
+                                        <option value="مشروع 2">مشروع التوسعة</option>
+                                        <option value="مشروع 3">مشروع الصيانة</option>
+                                        <option value="عام">مصروف عام</option>
+                                    </select>
+                                </div>
                                 <div class="col-12">
                                     <label class="form-label small">ملاحظات</label>
                                     <textarea id="cpSettlNotes" rows="2" class="form-control form-control-sm" placeholder="تفاصيل إضافية"></textarea>
@@ -428,6 +457,10 @@ class ExpensesManager {
                     exchangeRate: parseFloat(document.getElementById('cpSettlExRate')?.value)||1500,
                     method: document.getElementById('cpSettlMethod')?.value || 'cash',
                     reference: document.getElementById('cpSettlRef')?.value || '',
+                    receiptNumber: document.getElementById('cpSettlReceiptNo')?.value || '',
+                    accountingGuide: document.getElementById('cpSettlAccGuide')?.value || '',
+                    category: document.getElementById('cpSettlCategory')?.value || '',
+                    project: document.getElementById('cpSettlProject')?.value || '',
                     notes: document.getElementById('cpSettlNotes')?.value || '',
                     createExpense: !!document.getElementById('cpSettlCreateExpense')?.checked
                 };
@@ -460,7 +493,7 @@ class ExpensesManager {
         }).sort((a,b)=> new Date(b.date) - new Date(a.date));
 
         if(filtered.length===0){
-            body.innerHTML = `<tr><td colspan="11" class="text-center text-muted py-3"><i class="bi bi-inbox"></i> لا توجد قيود</td></tr>`;
+        body.innerHTML = `<tr><td colspan="12" class="text-center text-muted py-3"><i class="bi bi-inbox"></i> لا توجد قيود</td></tr>`;
             return;
         }
 
@@ -471,6 +504,7 @@ class ExpensesManager {
                 <tr>
                     <td>${cp.registrationNumber}</td>
                     <td>${cp.vendor||'-'}</td>
+            <td>${cp.description || '-'}</td>
                     <td>${new Date(cp.date).toLocaleDateString('ar-IQ')}</td>
                     <td>${this.formatCurrency(cp.amountUSD||0,'USD')}</td>
                     <td>${this.formatCurrency(paid.usd,'USD')}</td>
@@ -554,6 +588,10 @@ class ExpensesManager {
             exchangeRate: payment.exchangeRate||cp.exchangeRate||1500,
             method: payment.method||'cash',
             reference: payment.reference||'',
+            receiptNumber: payment.receiptNumber || payment.reference || '',
+            accountingGuide: payment.accountingGuide || '',
+            category: payment.category || '',
+            project: payment.project || '',
             notes: payment.notes||''
         };
         const payments = Array.isArray(cp.payments)? cp.payments.slice() : [];
@@ -577,6 +615,13 @@ class ExpensesManager {
 
     createExpenseForCPPayment(cp, payEntry){
         const desc = `تسديد شراء آجل رقم ${cp.registrationNumber} - ${cp.vendor||''}`.trim();
+        // استرجاع معلومات الدليل المحاسبي إن تم اختيارها في نموذج الدفعة
+        let accCode = '', accName = '';
+        if (payEntry.accountingGuide) {
+            const guide = StorageManager.getData(StorageManager.STORAGE_KEYS.ACCOUNTING_GUIDE) || [];
+            const item = guide.find(g => g.id === payEntry.accountingGuide);
+            if (item) { accCode = item.code || ''; accName = item.name || ''; }
+        }
         const expense = {
             registrationNumber: StorageManager.generateRegistrationNumber(),
             date: payEntry.date,
@@ -584,14 +629,15 @@ class ExpensesManager {
             amountUSD: payEntry.amountUSD||0,
             exchangeRate: payEntry.exchangeRate||cp.exchangeRate||1500,
             description: desc,
-            accountingGuide: '',
-            accountingGuideCode: '',
-            receiptNumber: payEntry.reference||'',
+            accountingGuide: payEntry.accountingGuide || '',
+            accountingGuideCode: accCode,
+            accountingGuideName: accName,
+            receiptNumber: payEntry.receiptNumber || payEntry.reference || '',
             receiptDate: payEntry.date,
             vendor: cp.vendor||'',
             paymentMethod: payEntry.method||'cash',
-            category: 'تسديد مشتريات آجل',
-            project: '',
+            category: payEntry.category || 'تسديد مشتريات آجل',
+            project: payEntry.project || '',
             notes: payEntry.notes||'',
             currency: this.determinePrimaryCurrency(payEntry.amountIQD||0, payEntry.amountUSD||0, payEntry.exchangeRate||cp.exchangeRate||1500),
             amount: this.calculatePrimaryAmount ? this.calculatePrimaryAmount(payEntry.amountIQD||0, payEntry.amountUSD||0, payEntry.exchangeRate||cp.exchangeRate||1500) : ((payEntry.amountUSD||0) || (payEntry.amountIQD||0)),
