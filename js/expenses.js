@@ -273,6 +273,7 @@ class ExpensesManager {
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h4 class="mb-0"><i class="bi bi-wallet2 me-2"></i>تسديد مبالغ الشراء بالآجل</h4>
                 <div class="d-flex gap-2 align-items-center">
+                    <button type="button" class="btn btn-outline-dark btn-sm" title="تقرير أعمار الديون" onclick="expensesManager.openCPAgingReport()"><i class="bi bi-calendar3"></i> أعمار الديون</button>
                     <select id="cpSettlFilterVendor" class="form-select form-select-sm" style="min-width:220px">
                         <option value="">كل الموردين</option>
                     </select>
@@ -424,6 +425,9 @@ class ExpensesManager {
                     </div>
                 </div>
             </div>
+            <!-- Panels: Payments History & Aging Report -->
+            <div id="cpPaymentsHistoryPanel" style="display:none" class="mt-3"></div>
+            <div id="cpAgingPanel" style="display:none" class="mt-3"></div>
         </div>`;
     }
 
@@ -521,9 +525,54 @@ class ExpensesManager {
                     <td>${this.formatCurrency(paid.iqd,'IQD')}</td>
                     <td>${this.formatCurrency(remain.iqd,'IQD')}</td>
                     <td><span class="badge bg-${(cp.status||'open')==='closed'?'success':(cp.status==='partial'?'warning':'secondary')}">${cp.status||'open'}</span></td>
-                    <td><button class="btn btn-sm btn-outline-primary" onclick="expensesManager.selectCPForSettlement('${cp.registrationNumber}')"><i class="bi bi-wallet2"></i></button></td>
+                    <td class="text-nowrap">
+                        <button class="btn btn-sm btn-outline-primary me-1" title="اختيار للدفع" onclick="expensesManager.selectCPForSettlement('${cp.registrationNumber}')"><i class="bi bi-wallet2"></i></button>
+                        <button class="btn btn-sm btn-outline-secondary" title="سجل الدفعات" onclick="expensesManager.showCPPaymentsHistory('${cp.registrationNumber}')"><i class="bi bi-journal-text"></i></button>
+                    </td>
                 </tr>`;
         }).join('');
+    }
+
+    // عرض سجل الدفعات لقيد محدد
+    showCPPaymentsHistory(regNo){
+        const panel = document.getElementById('cpPaymentsHistoryPanel');
+        if(!panel) return;
+        const list = StorageManager.getData(StorageManager.STORAGE_KEYS.CREDIT_PURCHASES) || [];
+        const cp = list.find(x=> x.registrationNumber===regNo);
+        if(!cp){ panel.style.display='none'; return; }
+        const payments = Array.isArray(cp.payments)? cp.payments.slice().sort((a,b)=> new Date(b.date)-new Date(a.date)) : [];
+        const rows = payments.length? payments.map(p=>`
+            <tr>
+                <td>${new Date(p.date).toLocaleDateString('ar-IQ')}</td>
+                <td>${this.formatCurrency(p.amountUSD||0,'USD')}</td>
+                <td>${this.formatCurrency(p.amountIQD||0,'IQD')}</td>
+                <td>${p.method||'-'}</td>
+                <td>${p.receiptNumber || p.reference || '-'}</td>
+                <td class="text-nowrap">
+                    <button class="btn btn-sm btn-outline-success me-1" title="طباعة" onclick="expensesManager.printSavedPayment('${cp.registrationNumber}','${p.id}')"><i class="bi bi-printer"></i></button>
+                    <button class="btn btn-sm btn-outline-primary me-1" title="تعديل" onclick="expensesManager.editSavedPayment('${cp.registrationNumber}','${p.id}')"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" title="حذف" onclick="expensesManager.deleteSavedPayment('${cp.registrationNumber}','${p.id}')"><i class="bi bi-trash"></i></button>
+                </td>
+            </tr>
+        `).join('') : `<tr><td colspan="6" class="text-center text-muted">لا توجد دفعات</td></tr>`;
+        panel.innerHTML = `
+            <div class="neumorphic-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="bi bi-journal-text me-1"></i>سجل الدفعات - ${cp.registrationNumber}</h6>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('cpPaymentsHistoryPanel').style.display='none'"><i class="bi bi-x"></i></button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle">
+                            <thead><tr><th>التاريخ</th><th>دولار</th><th>دينار</th><th>الطريقة</th><th>المرجع/الوصل</th><th>إجراءات</th></tr></thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>`;
+        panel.style.display='block';
+        // تأكيد التحديد في نموذج الدفعة
+        this.selectCPForSettlement(regNo);
     }
 
     selectCPForSettlement(regNo){
@@ -572,6 +621,106 @@ class ExpensesManager {
         if(out.usd > rem.usd){ out.usd = rem.usd; }
         if(out.iqd > rem.iqd){ out.iqd = rem.iqd; }
         return out;
+    }
+
+    // حذف دفعة محفوظة
+    deleteSavedPayment(regNo, payId){
+        if(!confirm('تأكيد حذف الدفعة؟')) return;
+        const list = StorageManager.getData(StorageManager.STORAGE_KEYS.CREDIT_PURCHASES) || [];
+        const idx = list.findIndex(x=> x.registrationNumber===regNo);
+        if(idx===-1) return;
+        const cp = list[idx];
+        const payments = (Array.isArray(cp.payments)? cp.payments:[]).filter(p=> p.id!==payId);
+        // إعادة حساب الحالة
+        const sums = payments.reduce((a,p)=>{ a.usd+=(+p.amountUSD||0); a.iqd+=(+p.amountIQD||0); return a; },{usd:0,iqd:0});
+        const remUSD = Math.max(0,(+cp.amountUSD||0)-sums.usd);
+        const remIQD = Math.max(0,(+cp.amountIQD||0)-sums.iqd);
+        const status = (remUSD===0 && remIQD===0) ? 'closed' : (sums.usd>0 || sums.iqd>0) ? 'partial' : 'open';
+        list[idx] = { ...cp, payments, status, updatedAt:new Date().toISOString() };
+        StorageManager.saveData(StorageManager.STORAGE_KEYS.CREDIT_PURCHASES, list);
+        this.renderCreditPurchaseSettlementsTable();
+        this.showCPPaymentsHistory(regNo);
+        this.showNotification('تم حذف الدفعة','success');
+    }
+
+    // تعديل دفعة محفوظة: تعبئة النموذج ثم حذف القديمة عند الحفظ الجديد
+    editSavedPayment(regNo, payId){
+        const list = StorageManager.getData(StorageManager.STORAGE_KEYS.CREDIT_PURCHASES) || [];
+        const cp = list.find(x=> x.registrationNumber===regNo);
+        if(!cp) return;
+        const p = (cp.payments||[]).find(x=> x.id===payId);
+        if(!p) return;
+        // اختر القيد في النموذج
+        this.selectCPForSettlement(regNo);
+        // عبئ حقول الدفع
+        const set = (id,val)=>{ const el=document.getElementById(id); if(el) el.value = val ?? ''; };
+        set('cpSettlDate', (p.date||'').split('T')[0] || p.date);
+        set('cpSettlPayUSD', p.amountUSD||0);
+        set('cpSettlPayIQD', p.amountIQD||0);
+        set('cpSettlExRate', p.exchangeRate||cp.exchangeRate||1500);
+        set('cpSettlMethod', p.method||'cash');
+        set('cpSettlRef', p.reference||'');
+        set('cpSettlReceiptNo', p.receiptNumber||'');
+        set('cpSettlAccGuide', p.accountingGuide||'');
+        set('cpSettlCategory', p.category||'');
+        set('cpSettlProject', p.project||'');
+        set('cpSettlNotes', p.notes||'');
+        // عند الحفظ: نحذف القديمة ثم نضيف الجديدة
+        const form = document.getElementById('cpSettlementForm');
+        if(form){
+            const originalSubmit = form._originalSubmitHandler;
+            if(!originalSubmit){
+                form._originalSubmitHandler = (e)=>{}; // placeholder
+            }
+            form.addEventListener('submit', (onceEv)=>{
+                // إزالة نفسها بعد أول مرة لتفادي التكرار
+                onceEv.currentTarget.removeEventListener('submit', arguments.callee);
+                // احذف الدفعة القديمة أولاً
+                const lst = StorageManager.getData(StorageManager.STORAGE_KEYS.CREDIT_PURCHASES) || [];
+                const i2 = lst.findIndex(x=> x.registrationNumber===regNo);
+                if(i2>-1){
+                    const c2 = lst[i2];
+                    const newPays = (c2.payments||[]).filter(x=> x.id!==payId);
+                    lst[i2] = { ...c2, payments:newPays };
+                    StorageManager.saveData(StorageManager.STORAGE_KEYS.CREDIT_PURCHASES, lst);
+                }
+            }, { once:true });
+        }
+        this.showNotification('تم تحميل الدفعة للتعديل، احفظ لاستبدالها','info');
+    }
+
+    // طباعة دفعة محفوظة
+    printSavedPayment(regNo, payId){
+        const list = StorageManager.getData(StorageManager.STORAGE_KEYS.CREDIT_PURCHASES) || [];
+        const cp = list.find(x=> x.registrationNumber===regNo);
+        if(!cp) return;
+        const p = (cp.payments||[]).find(x=> x.id===payId);
+        if(!p) return;
+        const entry = {
+            registrationNumber: p.id,
+            date: p.date,
+            description: `تسديد شراء آجل رقم ${cp.registrationNumber} - ${cp.vendor||''}`,
+            amountIQD: p.amountIQD||0,
+            amountUSD: p.amountUSD||0,
+            exchangeRate: p.exchangeRate||cp.exchangeRate||1500,
+            vendor: cp.vendor||'',
+            paymentMethod: p.method||'cash',
+            category: p.category || 'تسديد مشتريات آجل',
+            project: p.project || '',
+            receiptNumber: p.receiptNumber || p.reference || '',
+            notes: p.notes || ''
+        };
+        entry.currency = this.determinePrimaryCurrency(entry.amountIQD||0, entry.amountUSD||0, entry.exchangeRate||1500);
+        entry.amount = this.calculatePrimaryAmount(entry.amountIQD||0, entry.amountUSD||0, entry.exchangeRate||1500);
+        const body = this.generateExpenseReceiptHTML(entry);
+        const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('سند صرف - دفعة تسديد آجل') : '';
+        const footer = (typeof buildPrintFooterHTML === 'function') ? buildPrintFooterHTML() : '';
+        const html = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>طباعة دفعة - ${entry.registrationNumber}</title>
+        <style>@page{size:A4;margin:8mm}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:12px}}.receipt-container{max-width:700px!important;padding:12px!important;border-width:1px!important;margin:0 auto!important}.receipt-body{margin:12px 0!important}</style>
+        </head><body>${header}<div class="receipt-body">${body}</div>${footer}</body></html>`;
+        const w = window.open('', '_blank', 'width=900,height=700');
+        w.document.write(html); w.document.close();
+        w.onload = ()=> setTimeout(()=>{ try{ w.print(); }catch(_){} },300);
     }
 
     addCreditPurchasePayment(regNo, payment){
@@ -732,6 +881,67 @@ class ExpensesManager {
         const win = window.open('', '_blank', 'width=900,height=700');
         win.document.write(html); win.document.close();
         win.onload = () => setTimeout(()=>{ try { win.print(); } catch(_){} }, 300);
+    }
+
+    // ====== تقرير أعمار الديون للموردين ======
+    openCPAgingReport(){
+        const panel = document.getElementById('cpAgingPanel');
+        if(!panel) return;
+        const list = StorageManager.getData(StorageManager.STORAGE_KEYS.CREDIT_PURCHASES) || [];
+        // احسب المتبقي لكل قيد ثم جمّع بالمورد
+        const today = new Date();
+        const buckets = [
+            { key: 'current', label: 'غير مستحق بعد', match: (d)=> !d },
+            { key: 'lt30', label: '0-30 يوم', match: (days)=> days>=0 && days<=30 },
+            { key: 'd31_60', label: '31-60 يوم', match: (days)=> days>=31 && days<=60 },
+            { key: 'd61_90', label: '61-90 يوم', match: (days)=> days>=61 && days<=90 },
+            { key: 'gt90', label: '+90 يوم', match: (days)=> days>90 }
+        ];
+        const byVendor = {};
+        list.forEach(cp=>{
+            const paid = this.getCPPaidSums(cp);
+            const rem = this.getCPRemaining(cp, paid);
+            const totalRemUSD = rem.usd;
+            const totalRemIQD = rem.iqd;
+            if(totalRemUSD<=0 && totalRemIQD<=0) return;
+            const v = cp.vendor || 'غير محدد';
+            if(!byVendor[v]) byVendor[v] = buckets.reduce((a,b)=>{ a[b.key]={usd:0,iqd:0,items:[]}; return a; },{});
+            // days past due
+            let days = null;
+            if(cp.dueDate){
+                const diff = Math.floor((today - new Date(cp.dueDate)) / (1000*60*60*24));
+                days = diff;
+            }
+            const bucket = buckets.find(b=> b.key==='current' ? (!cp.dueDate || days<0) : b.match(days));
+            const slot = byVendor[v][(bucket?bucket.key:'current')];
+            slot.usd += totalRemUSD;
+            slot.iqd += totalRemIQD;
+            slot.items.push(cp);
+        });
+        // بناء الجدول
+        const headerRow = `<tr><th>المورد</th>${buckets.map(b=>`<th>${b.label} (USD)</th><th>${b.label} (IQD)</th>`).join('')}<th>الإجمالي USD</th><th>الإجمالي IQD</th></tr>`;
+        const bodyRows = Object.entries(byVendor).map(([vendor, data])=>{
+            const cells = buckets.map(b=>`<td>${this.formatCurrency(data[b.key].usd,'USD')}</td><td>${this.formatCurrency(data[b.key].iqd,'IQD')}</td>`).join('');
+            const sumUSD = buckets.reduce((s,b)=> s+data[b.key].usd,0);
+            const sumIQD = buckets.reduce((s,b)=> s+data[b.key].iqd,0);
+            return `<tr><td>${vendor}</td>${cells}<td>${this.formatCurrency(sumUSD,'USD')}</td><td>${this.formatCurrency(sumIQD,'IQD')}</td></tr>`;
+        }).join('') || `<tr><td colspan="${2*buckets.length+3}" class="text-center text-muted">لا توجد أرصدة مستحقة</td></tr>`;
+        panel.innerHTML = `
+            <div class="neumorphic-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="bi bi-calendar3 me-1"></i>تقرير أعمار الديون للموردين</h6>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('cpAgingPanel').style.display='none'"><i class="bi bi-x"></i></button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle">
+                            <thead>${headerRow}</thead>
+                            <tbody>${bodyRows}</tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>`;
+        panel.style.display = 'block';
     }
 
     createExpenseForCPPayment(cp, payEntry){
