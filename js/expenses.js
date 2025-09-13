@@ -1061,7 +1061,8 @@ class ExpensesManager {
                 <button class="btn btn-sm btn-outline-secondary" onclick="expensesManager.exportVendorStatement()"><i class="bi bi-download"></i> تصدير CSV</button>
                 <button class="btn btn-sm btn-outline-primary" onclick="expensesManager.printVendorStatement()"><i class="bi bi-printer"></i> طباعة</button>
             </div>`;
-        const rows = stmt.rows.map(r=>`<tr>
+        const rows = stmt.rows.map((r,idx)=>`<tr>
+            <td>${idx+1}</td>
             <td>${this.formatDate(r.date)}</td>
             <td>${r.type}</td>
             <td>${r.registrationNumber}</td>
@@ -1091,8 +1092,8 @@ class ExpensesManager {
                 </div>
             </div>
         </div>`;
-    el.innerHTML = `${head}<div class="table-responsive"><table class="table table-sm table-striped align-middle"><thead>
-            <tr><th>التاريخ</th><th>نوع العملية</th><th>القيد</th><th>الوصف</th><th>مدين USD</th><th>مدين IQD</th><th>الرصيد USD</th><th>الرصيد IQD</th></tr>
+        el.innerHTML = `${head}<div class="table-responsive"><table class="table table-sm table-striped align-middle"><thead>
+            <tr><th>تسلسل</th><th>التاريخ</th><th>نوع العملية</th><th>القيد</th><th>الوصف</th><th>مدين USD</th><th>مدين IQD</th><th>الرصيد USD</th><th>الرصيد IQD</th></tr>
     </thead><tbody>${rows}</tbody></table></div>`;
         // خزّن آخر بيان لحاجات الطباعة/التصدير
         this._lastVendorStatement = stmt;
@@ -1100,10 +1101,10 @@ class ExpensesManager {
 
     exportVendorStatement(){
         const stmt = this._lastVendorStatement; if(!stmt){ alert('شغّل كشف الحساب أولاً'); return; }
-        const headers = ['Date','Type','Registration','Description','USD','IQD','RunningUSD','RunningIQD'];
+        const headers = ['Seq','Date','Type','Registration','Description','USD','IQD','RunningUSD','RunningIQD'];
         const csvRows = [headers.join(',')].concat(
-            stmt.rows.map(r=>[
-                this.formatDate(r.date), r.type, r.registrationNumber, (r.description||'').replace(/[,\n]/g,' '), r.usd, r.iqd, r.balUSD, r.balIQD
+            stmt.rows.map((r,idx)=>[
+                idx+1, this.formatDate(r.date), r.type, r.registrationNumber, (r.description||'').replace(/[,\n]/g,' '), r.usd, r.iqd, r.balUSD, r.balIQD
             ].join(','))
         );
         const blob = new Blob([csvRows.join('\n')], {type:'text/csv;charset=utf-8;'});
@@ -1115,8 +1116,8 @@ class ExpensesManager {
 
     printVendorStatement(){
         const stmt = this._lastVendorStatement; if(!stmt){ alert('شغّل كشف الحساب أولاً'); return; }
-        const tableRows = stmt.rows.map(r=>`<tr>
-            <td>${this.formatDate(r.date)}</td><td>${r.type}</td><td>${r.registrationNumber}</td><td>${r.description||''}</td>
+        const tableRows = stmt.rows.map((r,idx)=>`<tr>
+            <td>${idx+1}</td><td>${this.formatDate(r.date)}</td><td>${r.type}</td><td>${r.registrationNumber}</td><td>${r.description||''}</td>
             <td style="text-align:left">${this.formatCurrency(r.usd,'USD')}</td><td style="text-align:left">${this.formatCurrency(r.iqd,'IQD')}</td>
             <td style="text-align:left">${this.formatCurrency(r.balUSD,'USD')}</td><td style="text-align:left">${this.formatCurrency(r.balIQD,'IQD')}</td>
         </tr>`).join('');
@@ -1143,9 +1144,13 @@ class ExpensesManager {
             </div>`;
         const content = `
             <h3 class="mb-1">كشف حساب مورد</h3>
-            ${headerBar}
             <table class="table table-sm table-striped" style="width:100%">
-                <thead><tr><th>التاريخ</th><th>نوع العملية</th><th>القيد</th><th>الوصف</th><th>مدين USD</th><th>مدين IQD</th><th>الرصيد USD</th><th>الرصيد IQD</th></tr></thead>
+                <thead>
+                    <tr><th colspan="9" style="border:none; padding-bottom:6px;">
+                        ${headerBar}
+                    </th></tr>
+                    <tr><th>تسلسل</th><th>التاريخ</th><th>نوع العملية</th><th>القيد</th><th>الوصف</th><th>مدين USD</th><th>مدين IQD</th><th>الرصيد USD</th><th>الرصيد IQD</th></tr>
+                </thead>
                 <tbody>${tableRows}</tbody>
             </table>
         `;
@@ -1155,7 +1160,10 @@ class ExpensesManager {
         <style>
             /* Landscape orientation for this report only */
             @page { size: A4 landscape; margin: 10mm; }
-            @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+            @media print {
+                body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                table thead { display: table-header-group; }
+            }
             .table{font-size:12px;} th,td{padding:4px 6px;}
             .receipt-body{max-width:100%;}
             /* Keep cards on one row in header */
