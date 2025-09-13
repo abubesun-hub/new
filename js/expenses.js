@@ -412,8 +412,10 @@ class ExpensesManager {
                                         <label class="form-check-label small" for="cpSettlCreateExpense">إنشاء قيد مصروف تلقائياً لهذا الدفع</label>
                                     </div>
                                 </div>
-                                <div class="col-12 d-flex gap-2">
+                                <div class="col-12 d-flex flex-wrap gap-2">
                                     <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>حفظ الدفعة</button>
+                                    <button type="button" class="btn btn-info btn-sm" id="cpSettlPreviewBtn"><i class="bi bi-eye me-1"></i>معاينة الفاتورة</button>
+                                    <button type="button" class="btn btn-warning btn-sm" id="cpSettlPrintBtn"><i class="bi bi-printer me-1"></i>طباعة الفاتورة</button>
                                     <button type="button" class="btn btn-secondary btn-sm" id="cpSettlResetBtn"><i class="bi bi-arrow-counterclockwise me-1"></i>إعادة</button>
                                 </div>
                                 <div class="col-12 small text-muted">يتم منع تجاوز المبلغ المتبقي تلقائياً.</div>
@@ -478,6 +480,12 @@ class ExpensesManager {
                 this.selectCPForSettlement(regEl.value);
             }
         } }
+
+    // معاينة وطباعة الفاتورة من نموذج الدفعة مباشرة
+    const prevBtn = document.getElementById('cpSettlPreviewBtn');
+    if(prevBtn){ prevBtn.onclick = ()=> this.previewSettlementPaymentInvoice(); }
+    const printBtn = document.getElementById('cpSettlPrintBtn');
+    if(printBtn){ printBtn.onclick = ()=> this.printSettlementPaymentInvoice(); }
     }
 
     renderCreditPurchaseSettlementsTable(){
@@ -611,6 +619,73 @@ class ExpensesManager {
         // حدّث نموذج الملخص للقيد الحالي
         this.selectCPForSettlement(regNo);
         this.showNotification('تم حفظ الدفعة بنجاح', 'success');
+    }
+
+    // ====== طباعة/معاينة فاتورة الدفعة (سند صرف) من نموذج التسديد ======
+    buildSettlementTempExpenseFromForm(){
+        const reg = document.getElementById('cpSettlReg')?.value || '';
+        if(!reg){ this.showNotification('اختر قيداً من الجدول أولاً', 'error'); return null; }
+        const payUSD = parseFloat(document.getElementById('cpSettlPayUSD')?.value)||0;
+        const payIQD = parseFloat(document.getElementById('cpSettlPayIQD')?.value)||0;
+        if(payUSD<=0 && payIQD<=0){ this.showNotification('أدخل مبلغ دفع بالدولار أو الدينار', 'error'); return null; }
+        const exRate = parseFloat(document.getElementById('cpSettlExRate')?.value)||1500;
+        const date = document.getElementById('cpSettlDate')?.value || new Date().toISOString().split('T')[0];
+        const vendor = document.getElementById('cpSettlVendor')?.value || '';
+        const category = document.getElementById('cpSettlCategory')?.value || 'تسديد مشتريات آجل';
+        const project = document.getElementById('cpSettlProject')?.value || '';
+        const method = document.getElementById('cpSettlMethod')?.value || 'cash';
+        const notes = document.getElementById('cpSettlNotes')?.value || '';
+        const receiptNo = (document.getElementById('cpSettlReceiptNo')?.value || document.getElementById('cpSettlRef')?.value || '');
+        const accGuide = document.getElementById('cpSettlAccGuide')?.value || '';
+        // توصيف البيان كما يُحفظ لاحقاً
+        const desc = `تسديد شراء آجل رقم ${reg} - ${vendor}`.trim();
+        const entry = {
+            id: 'TMP-'+Date.now(),
+            registrationNumber: 'TMP-'+Date.now().toString().slice(-6),
+            date,
+            description: desc,
+            amountIQD: payIQD,
+            amountUSD: payUSD,
+            exchangeRate: exRate,
+            vendor,
+            paymentMethod: method,
+            category,
+            project,
+            receiptNumber: receiptNo,
+            notes,
+            accountingGuide: accGuide
+        };
+        // العملة والمبلغ الأساسي
+        entry.currency = this.determinePrimaryCurrency(entry.amountIQD||0, entry.amountUSD||0, entry.exchangeRate||1500);
+        entry.amount = this.calculatePrimaryAmount(entry.amountIQD||0, entry.amountUSD||0, entry.exchangeRate||1500);
+        entry.hasBothCurrencies = (entry.amountUSD>0 && entry.amountIQD>0);
+        entry.hasIQDOnly = (entry.amountIQD>0 && entry.amountUSD===0);
+        entry.hasUSDOnly = (entry.amountUSD>0 && entry.amountIQD===0);
+        return entry;
+    }
+
+    previewSettlementPaymentInvoice(){
+        const entry = this.buildSettlementTempExpenseFromForm();
+        if(!entry) return;
+        // أعِد استخدام مولد إيصال المصروف
+        const bodyHtml = this.generateExpenseReceiptHTML(entry);
+        const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('سند صرف - دفعة تسديد آجل') : '';
+        const footer = (typeof buildPrintFooterHTML === 'function') ? buildPrintFooterHTML() : '';
+        const html = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>معاينة دفعة - ${entry.registrationNumber}</title><link rel="stylesheet" href="css/style.css"></head><body>${header}<div class="receipt-body">${bodyHtml}</div>${footer}</body></html>`;
+        const w = window.open('', '_blank', 'width=900,height=700');
+        w.document.write(html); w.document.close();
+    }
+
+    printSettlementPaymentInvoice(){
+        const entry = this.buildSettlementTempExpenseFromForm();
+        if(!entry) return;
+        const bodyHtml = this.generateExpenseReceiptHTML(entry);
+        const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('سند صرف - دفعة تسديد آجل') : '';
+        const footer = (typeof buildPrintFooterHTML === 'function') ? buildPrintFooterHTML() : '';
+        const html = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>طباعة دفعة - ${entry.registrationNumber}</title><link rel="stylesheet" href="css/style.css"></head><body>${header}<div class="receipt-body">${bodyHtml}</div>${footer}</body></html>`;
+        const win = window.open('', '_blank', 'width=900,height=700');
+        win.document.write(html); win.document.close();
+        win.onload = () => setTimeout(()=>{ try { win.print(); } catch(_){} }, 300);
     }
 
     createExpenseForCPPayment(cp, payEntry){
