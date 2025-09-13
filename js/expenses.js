@@ -273,7 +273,6 @@ class ExpensesManager {
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h4 class="mb-0"><i class="bi bi-wallet2 me-2"></i>تسديد مبالغ الشراء بالآجل</h4>
                 <div class="d-flex gap-2 align-items-center">
-                    <button type="button" class="btn btn-outline-dark btn-sm" title="تقرير أعمار الديون" onclick="expensesManager.openCPAgingReport()"><i class="bi bi-calendar3"></i> أعمار الديون</button>
                     <select id="cpSettlFilterVendor" class="form-select form-select-sm" style="min-width:220px">
                         <option value="">كل الموردين</option>
                     </select>
@@ -425,9 +424,8 @@ class ExpensesManager {
                     </div>
                 </div>
             </div>
-            <!-- Panels: Payments History & Aging Report -->
+            <!-- Panels: Payments History -->
             <div id="cpPaymentsHistoryPanel" style="display:none" class="mt-3"></div>
-            <div id="cpAgingPanel" style="display:none" class="mt-3"></div>
         </div>`;
     }
 
@@ -883,66 +881,7 @@ class ExpensesManager {
         win.onload = () => setTimeout(()=>{ try { win.print(); } catch(_){} }, 300);
     }
 
-    // ====== تقرير أعمار الديون للموردين ======
-    openCPAgingReport(){
-        const panel = document.getElementById('cpAgingPanel');
-        if(!panel) return;
-        const list = StorageManager.getData(StorageManager.STORAGE_KEYS.CREDIT_PURCHASES) || [];
-        // احسب المتبقي لكل قيد ثم جمّع بالمورد
-        const today = new Date();
-        const buckets = [
-            { key: 'current', label: 'غير مستحق بعد', match: (d)=> !d },
-            { key: 'lt30', label: '0-30 يوم', match: (days)=> days>=0 && days<=30 },
-            { key: 'd31_60', label: '31-60 يوم', match: (days)=> days>=31 && days<=60 },
-            { key: 'd61_90', label: '61-90 يوم', match: (days)=> days>=61 && days<=90 },
-            { key: 'gt90', label: '+90 يوم', match: (days)=> days>90 }
-        ];
-        const byVendor = {};
-        list.forEach(cp=>{
-            const paid = this.getCPPaidSums(cp);
-            const rem = this.getCPRemaining(cp, paid);
-            const totalRemUSD = rem.usd;
-            const totalRemIQD = rem.iqd;
-            if(totalRemUSD<=0 && totalRemIQD<=0) return;
-            const v = cp.vendor || 'غير محدد';
-            if(!byVendor[v]) byVendor[v] = buckets.reduce((a,b)=>{ a[b.key]={usd:0,iqd:0,items:[]}; return a; },{});
-            // days past due
-            let days = null;
-            if(cp.dueDate){
-                const diff = Math.floor((today - new Date(cp.dueDate)) / (1000*60*60*24));
-                days = diff;
-            }
-            const bucket = buckets.find(b=> b.key==='current' ? (!cp.dueDate || days<0) : b.match(days));
-            const slot = byVendor[v][(bucket?bucket.key:'current')];
-            slot.usd += totalRemUSD;
-            slot.iqd += totalRemIQD;
-            slot.items.push(cp);
-        });
-        // بناء الجدول
-        const headerRow = `<tr><th>المورد</th>${buckets.map(b=>`<th>${b.label} (USD)</th><th>${b.label} (IQD)</th>`).join('')}<th>الإجمالي USD</th><th>الإجمالي IQD</th></tr>`;
-        const bodyRows = Object.entries(byVendor).map(([vendor, data])=>{
-            const cells = buckets.map(b=>`<td>${this.formatCurrency(data[b.key].usd,'USD')}</td><td>${this.formatCurrency(data[b.key].iqd,'IQD')}</td>`).join('');
-            const sumUSD = buckets.reduce((s,b)=> s+data[b.key].usd,0);
-            const sumIQD = buckets.reduce((s,b)=> s+data[b.key].iqd,0);
-            return `<tr><td>${vendor}</td>${cells}<td>${this.formatCurrency(sumUSD,'USD')}</td><td>${this.formatCurrency(sumIQD,'IQD')}</td></tr>`;
-        }).join('') || `<tr><td colspan="${2*buckets.length+3}" class="text-center text-muted">لا توجد أرصدة مستحقة</td></tr>`;
-        panel.innerHTML = `
-            <div class="neumorphic-card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0"><i class="bi bi-calendar3 me-1"></i>تقرير أعمار الديون للموردين</h6>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('cpAgingPanel').style.display='none'"><i class="bi bi-x"></i></button>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped align-middle">
-                            <thead>${headerRow}</thead>
-                            <tbody>${bodyRows}</tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>`;
-        panel.style.display = 'block';
-    }
+    // (تمت إزالة تقرير أعمار الديون بناءً على طلب المستخدم)
 
     createExpenseForCPPayment(cp, payEntry){
         const desc = `تسديد شراء آجل رقم ${cp.registrationNumber} - ${cp.vendor||''}`.trim();
