@@ -1054,10 +1054,25 @@ class ExpensesManager {
             <td>${this.formatCurrency(r.balUSD,'USD')}</td>
             <td>${this.formatCurrency(r.balIQD,'IQD')}</td>
         </tr>`).join('') || `<tr><td colspan="8" class="text-center text-muted">لا بيانات ضمن الفترة</td></tr>`;
-        const summary = `<div class="row g-2 my-2">
-            <div class="col-md-3"><div class="border rounded p-2 bg-light">إجمالي المشتريات: ${this.formatCurrency(stmt.totals.purchUSD,'USD')} | ${this.formatCurrency(stmt.totals.purchIQD,'IQD')}</div></div>
-            <div class="col-md-3"><div class="border rounded p-2 bg-light">إجمالي الدفعات: ${this.formatCurrency(stmt.totals.payUSD,'USD')} | ${this.formatCurrency(stmt.totals.payIQD,'IQD')}</div></div>
-            <div class="col-md-3"><div class="border rounded p-2 bg-light">الرصيد النهائي: ${this.formatCurrency(stmt.balance.usd,'USD')} | ${this.formatCurrency(stmt.balance.iqd,'IQD')}</div></div>
+        const summary = `<div class="row justify-content-center g-3 my-3">
+            <div class="col-12 col-md-3">
+                <div class="border rounded shadow-sm p-3 text-center bg-white">
+                    <div class="text-muted small mb-1">إجمالي المشتريات</div>
+                    <div class="fw-bold">${this.formatCurrency(stmt.totals.purchUSD,'USD')} | ${this.formatCurrency(stmt.totals.purchIQD,'IQD')}</div>
+                </div>
+            </div>
+            <div class="col-12 col-md-3">
+                <div class="border rounded shadow-sm p-3 text-center bg-white">
+                    <div class="text-muted small mb-1">إجمالي الدفعات</div>
+                    <div class="fw-bold">${this.formatCurrency(stmt.totals.payUSD,'USD')} | ${this.formatCurrency(stmt.totals.payIQD,'IQD')}</div>
+                </div>
+            </div>
+            <div class="col-12 col-md-3">
+                <div class="border rounded shadow-sm p-3 text-center bg-white">
+                    <div class="text-muted small mb-1">الرصيد النهائي</div>
+                    <div class="fw-bold">${this.formatCurrency(stmt.balance.usd,'USD')} | ${this.formatCurrency(stmt.balance.iqd,'IQD')}</div>
+                </div>
+            </div>
         </div>`;
         el.innerHTML = `${head}<div class="table-responsive"><table class="table table-sm table-striped align-middle"><thead>
             <tr><th>التاريخ</th><th>نوع العملية</th><th>القيد</th><th>الوصف</th><th>مدين USD</th><th>مدين IQD</th><th>الرصيد USD</th><th>الرصيد IQD</th></tr>
@@ -1095,14 +1110,33 @@ class ExpensesManager {
                 <thead><tr><th>التاريخ</th><th>نوع العملية</th><th>القيد</th><th>الوصف</th><th>مدين USD</th><th>مدين IQD</th><th>الرصيد USD</th><th>الرصيد IQD</th></tr></thead>
                 <tbody>${tableRows}</tbody>
             </table>
-            <div class="mt-2">إجمالي المشتريات: ${this.formatCurrency(stmt.totals.purchUSD,'USD')} | ${this.formatCurrency(stmt.totals.purchIQD,'IQD')}</div>
-            <div>إجمالي الدفعات: ${this.formatCurrency(stmt.totals.payUSD,'USD')} | ${this.formatCurrency(stmt.totals.payIQD,'IQD')}</div>
-            <div class="fw-bold">الرصيد النهائي: ${this.formatCurrency(stmt.balance.usd,'USD')} | ${this.formatCurrency(stmt.balance.iqd,'IQD')}</div>
+            <div class="summary-cards" style="margin-top:8px;">
+                <div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center;">
+                    <div style="border:1px solid #ddd; border-radius:8px; padding:10px 14px; min-width:220px; text-align:center; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+                        <div style="color:#6c757d; font-size:12px; margin-bottom:4px;">إجمالي المشتريات</div>
+                        <div style="font-weight:700;">
+                            ${this.formatCurrency(stmt.totals.purchUSD,'USD')} | ${this.formatCurrency(stmt.totals.purchIQD,'IQD')}
+                        </div>
+                    </div>
+                    <div style="border:1px solid #ddd; border-radius:8px; padding:10px 14px; min-width:220px; text-align:center; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+                        <div style="color:#6c757d; font-size:12px; margin-bottom:4px;">إجمالي الدفعات</div>
+                        <div style="font-weight:700;">
+                            ${this.formatCurrency(stmt.totals.payUSD,'USD')} | ${this.formatCurrency(stmt.totals.payIQD,'IQD')}
+                        </div>
+                    </div>
+                    <div style="border:1px solid #ddd; border-radius:8px; padding:10px 14px; min-width:220px; text-align:center; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+                        <div style="color:#6c757d; font-size:12px; margin-bottom:4px;">الرصيد النهائي</div>
+                        <div style="font-weight:700;">
+                            ${this.formatCurrency(stmt.balance.usd,'USD')} | ${this.formatCurrency(stmt.balance.iqd,'IQD')}
+                        </div>
+                    </div>
+                </div>
+            </div>
         `;
         const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('كشف حساب مورد') : '';
         const footer = (typeof buildPrintFooterHTML === 'function') ? buildPrintFooterHTML() : '';
         const html = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>كشف حساب مورد</title><link rel="stylesheet" href="css/style.css">
-        <style>@page{size:A4;margin:10mm;} .table{font-size:12px;} th,td{padding:4px 6px;} .print-header .program-name{display:none}</style>
+        <style>@page{size:A4;margin:10mm;} .table{font-size:12px;} th,td{padding:4px 6px;}</style>
         </head><body>${header}<div class="receipt-body">${content}</div>${footer}</body></html>`;
         const w = window.open('', '_blank', 'width=900,height=700');
         w.document.write(html); w.document.close(); w.onload = ()=> setTimeout(()=>{ try{ w.print(); }catch(_){ } }, 200);
