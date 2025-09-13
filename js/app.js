@@ -277,6 +277,12 @@ class AccountingApp {
                                 تقرير المصروفات
                             </button>
                         </div>
+                        <div class="col-md-4 mb-3">
+                            <button class="btn btn-warning neumorphic-btn w-100" onclick="app.generateCreditPurchaseReport()">
+                                <i class="bi bi-cart-check me-2"></i>
+                                تقرير الشراء بالآجل
+                            </button>
+                        </div>
                     </div>
                     <div class="mt-4">
                         <h5>تقارير سريعة</h5>
@@ -1544,6 +1550,508 @@ class AccountingApp {
                 </div>
             </div>
         `;
+    }
+
+    // ===== تقرير الشراء بالآجل =====
+    generateCreditPurchaseReport() {
+        this.showCreditPurchaseReportPage();
+    }
+
+    showCreditPurchaseReportPage() {
+        // Switch to reports section first
+        this.showSection('reports');
+
+        setTimeout(() => {
+            const reportsSection = document.getElementById('reportsSection');
+            if (reportsSection) {
+                reportsSection.innerHTML = this.generateCreditPurchaseReportHTML();
+                this.loadCreditPurchaseReportData();
+                this.setupCreditPurchaseReportSearch();
+            }
+        }, 100);
+    }
+
+    generateCreditPurchaseReportHTML() {
+        // Build vendor options
+        const data = StorageManager.getAllData();
+        const vendors = data.creditPurchaseSuppliers || [];
+        const vendorOptions = ['<option value="">جميع الموردين</option>']
+            .concat(vendors.map(v => `<option value="${v.id}">${v.name}</option>`))
+            .join('');
+
+        return `
+            <div class="cp-report-container">
+                <!-- Header -->
+                <div class="neumorphic-card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h4><i class="bi bi-cart-check me-2"></i>تقرير الشراء بالآجل</h4>
+                        <div class="report-actions">
+                            <button class="btn btn-success neumorphic-btn btn-sm" onclick="app.printCreditPurchaseReport()">
+                                <i class="bi bi-printer me-1"></i>طباعة
+                            </button>
+                            <button class="btn btn-primary neumorphic-btn btn-sm ms-2" onclick="app.exportCreditPurchaseReport()">
+                                <i class="bi bi-download me-1"></i>تصدير CSV
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="neumorphic-card mb-3">
+                    <div class="card-header">
+                        <h5><i class="bi bi-search me-2"></i>البحث والتصفية</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-3">
+                                <label class="form-label">المورد</label>
+                                <select id="cprVendor" class="form-control neumorphic-input">${vendorOptions}</select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">نوع القيد</label>
+                                <select id="cprType" class="form-control neumorphic-input">
+                                    <option value="">الكل</option>
+                                    <option value="purchase_receipt">وصل شراء</option>
+                                    <option value="measurement">ذرعة محتسبة</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">الحالة</label>
+                                <select id="cprStatus" class="form-control neumorphic-input">
+                                    <option value="">الكل</option>
+                                    <option value="open">مفتوح</option>
+                                    <option value="partial">مسدد جزئياً</option>
+                                    <option value="closed">مغلق</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">من تاريخ الشراء</label>
+                                <input type="date" id="cprDateFrom" class="form-control neumorphic-input">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">إلى تاريخ الشراء</label>
+                                <input type="date" id="cprDateTo" class="form-control neumorphic-input" value="${new Date().toISOString().split('T')[0]}">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">من تاريخ الاستحقاق</label>
+                                <input type="date" id="cprDueFrom" class="form-control neumorphic-input">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">إلى تاريخ الاستحقاق</label>
+                                <input type="date" id="cprDueTo" class="form-control neumorphic-input">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">رقم القيد</label>
+                                <input type="text" id="cprReg" class="form-control neumorphic-input" placeholder="بداية الرقم..">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">نص حر</label>
+                                <input type="text" id="cprQuery" class="form-control neumorphic-input" placeholder="الوصف/ملاحظات">
+                            </div>
+                            <div class="col-md-2 d-flex align-items-center">
+                                <div class="form-check mt-4">
+                                    <input class="form-check-input" type="checkbox" id="cprOnlyOverdue">
+                                    <label class="form-check-label" for="cprOnlyOverdue">متأخر فقط</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4 d-flex gap-2 mt-2">
+                                <button class="btn btn-primary neumorphic-btn flex-grow-1" onclick="app.searchCreditPurchaseReport()">
+                                    <i class="bi bi-search me-1"></i>بحث
+                                </button>
+                                <button class="btn btn-secondary neumorphic-btn" onclick="app.clearCreditPurchaseReportFilters()">
+                                    <i class="bi bi-x-circle me-1"></i>مسح
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary -->
+                <div class="row mb-3">
+                    <div class="col-md-3 mb-2">
+                        <div class="neumorphic-card text-center p-3">
+                            <div class="text-muted">إجمالي الدولار</div>
+                            <div id="cprTotalUSD" class="fw-bold text-success">$0.00</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <div class="neumorphic-card text-center p-3">
+                            <div class="text-muted">إجمالي الدينار</div>
+                            <div id="cprTotalIQD" class="fw-bold text-primary">0 د.ع</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <div class="neumorphic-card text-center p-3">
+                            <div class="text-muted">المتبقي بالدولار</div>
+                            <div id="cprRemainUSD" class="fw-bold text-danger">$0.00</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <div class="neumorphic-card text-center p-3">
+                            <div class="text-muted">المتبقي بالدينار</div>
+                            <div id="cprRemainIQD" class="fw-bold text-warning">0 د.ع</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Table -->
+                <div class="neumorphic-card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-table me-2"></i>تفاصيل الشراء بالآجل</h5>
+                        <div class="text-muted small" id="cprCount"></div>
+                    </div>
+                    <div class="card-body">
+                        <div id="cprTableWrap" class="table-responsive"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    setupCreditPurchaseReportSearch() {
+        const inputs = ['cprVendor','cprType','cprStatus','cprDateFrom','cprDateTo','cprDueFrom','cprDueTo','cprReg','cprQuery','cprOnlyOverdue'];
+        inputs.forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const evt = (el.tagName === 'SELECT' || el.type === 'checkbox') ? 'change' : 'input';
+            el.addEventListener(evt, () => this.searchCreditPurchaseReport());
+        });
+    }
+
+    searchCreditPurchaseReport() {
+        this.loadCreditPurchaseReportData(this.getCreditPurchaseReportCriteria());
+    }
+
+    clearCreditPurchaseReportFilters() {
+        ['cprVendor','cprType','cprStatus','cprDateFrom','cprDateTo','cprDueFrom','cprDueTo','cprReg','cprQuery','cprOnlyOverdue']
+            .forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                if (el.type === 'checkbox') el.checked = false; else el.value = '';
+            });
+        document.getElementById('cprDateTo').value = new Date().toISOString().split('T')[0];
+        this.loadCreditPurchaseReportData();
+    }
+
+    getCreditPurchaseReportCriteria() {
+        return {
+            vendorId: document.getElementById('cprVendor')?.value || '',
+            type: document.getElementById('cprType')?.value || '',
+            status: document.getElementById('cprStatus')?.value || '',
+            dateFrom: document.getElementById('cprDateFrom')?.value || '',
+            dateTo: document.getElementById('cprDateTo')?.value || '',
+            dueFrom: document.getElementById('cprDueFrom')?.value || '',
+            dueTo: document.getElementById('cprDueTo')?.value || '',
+            reg: document.getElementById('cprReg')?.value || '',
+            query: (document.getElementById('cprQuery')?.value || '').trim().toLowerCase(),
+            onlyOverdue: !!document.getElementById('cprOnlyOverdue')?.checked
+        };
+    }
+
+    loadCreditPurchaseReportData(criteria = null) {
+        const all = (StorageManager.getAllData().creditPurchases || []).slice();
+        const list = criteria ? this.filterCreditPurchasesForReport(all, criteria) : all;
+
+        // Compute rows with paid/remaining and overdue
+        const today = new Date();
+        const rows = list.sort((a,b) => new Date(b.date) - new Date(a.date)).map((cp, idx) => {
+            const paid = this.computeCPPaidSums(cp);
+            const remain = this.computeCPRemaining(cp, paid);
+            const due = cp.dueDate ? new Date(cp.dueDate) : null;
+            let overdueDays = 0;
+            if (due && (cp.status !== 'closed')) {
+                const diff = Math.floor((today - due) / (1000*60*60*24));
+                overdueDays = diff > 0 ? diff : 0;
+            }
+            return {
+                seq: idx + 1,
+                registrationNumber: cp.registrationNumber,
+                date: cp.date,
+                vendor: cp.vendor || '-',
+                description: cp.description || '-',
+                totalUSD: parseFloat(cp.amountUSD) || 0,
+                paidUSD: paid.usd,
+                remainUSD: remain.usd,
+                totalIQD: parseFloat(cp.amountIQD) || 0,
+                paidIQD: paid.iqd,
+                remainIQD: remain.iqd,
+                dueDate: cp.dueDate || '',
+                overdueDays,
+                status: cp.status || 'open',
+                type: cp.creditType === 'measurement' ? 'ذرعة' : 'وصل شراء'
+            };
+        });
+
+        this.updateCreditPurchaseReportSummary(rows);
+        this.renderCreditPurchaseReportTable(rows);
+    }
+
+    filterCreditPurchasesForReport(list, c) {
+        const toDate = v => v ? new Date(v) : null;
+        const df = toDate(c.dateFrom), dt = toDate(c.dateTo), duf = toDate(c.dueFrom), dut = toDate(c.dueTo);
+        return (list || []).filter(it => {
+            if (c.vendorId && (it.vendorId || '') !== c.vendorId) return false;
+            if (c.type && (it.creditType || '') !== c.type) return false;
+            if (c.status && (it.status || 'open') !== c.status) return false;
+            const d = new Date(it.date);
+            if (df && d < df) return false;
+            if (dt && d > dt) return false;
+            if (duf || dut) {
+                if (!it.dueDate) return false;
+                const dd = new Date(it.dueDate);
+                if (duf && dd < duf) return false;
+                if (dut && dd > dut) return false;
+            }
+            if (c.reg && !(it.registrationNumber || '').toString().startsWith(c.reg)) return false;
+            if (c.query) {
+                const hay = [it.registrationNumber, it.vendor, it.description, it.purchaseReceiptNumber, it.measurementNumber]
+                    .map(v => (v || '').toString().toLowerCase()).join(' ');
+                if (!hay.includes(c.query)) return false;
+            }
+            if (c.onlyOverdue) {
+                const due = it.dueDate ? new Date(it.dueDate) : null;
+                const isOverdue = due && (new Date() > due) && ((it.status || 'open') !== 'closed');
+                if (!isOverdue) return false;
+            }
+            return true;
+        });
+    }
+
+    computeCPPaidSums(cp) {
+        const pays = Array.isArray(cp.payments) ? cp.payments : [];
+        return pays.reduce((acc, p) => {
+            acc.usd += parseFloat(p.amountUSD) || 0;
+            acc.iqd += parseFloat(p.amountIQD) || 0;
+            return acc;
+        }, { usd: 0, iqd: 0 });
+    }
+
+    computeCPRemaining(cp, paid) {
+        const totalUSD = parseFloat(cp.amountUSD) || 0;
+        const totalIQD = parseFloat(cp.amountIQD) || 0;
+        return {
+            usd: Math.max(0, totalUSD - (paid?.usd || 0)),
+            iqd: Math.max(0, totalIQD - (paid?.iqd || 0))
+        };
+    }
+
+    updateCreditPurchaseReportSummary(rows) {
+        const sum = rows.reduce((a, r) => {
+            a.totalUSD += r.totalUSD; a.totalIQD += r.totalIQD;
+            a.remainUSD += r.remainUSD; a.remainIQD += r.remainIQD; return a;
+        }, { totalUSD: 0, totalIQD: 0, remainUSD: 0, remainIQD: 0 });
+        const set = (id, val, cur) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = this.formatCurrency(val, cur);
+        };
+        set('cprTotalUSD', sum.totalUSD, 'USD');
+        set('cprTotalIQD', sum.totalIQD, 'IQD');
+        set('cprRemainUSD', sum.remainUSD, 'USD');
+        set('cprRemainIQD', sum.remainIQD, 'IQD');
+        const countEl = document.getElementById('cprCount');
+        if (countEl) countEl.textContent = `${rows.length} سجل`;
+    }
+
+    renderCreditPurchaseReportTable(rows) {
+        const wrap = document.getElementById('cprTableWrap');
+        if (!wrap) return;
+        if (!rows || rows.length === 0) {
+            wrap.innerHTML = '<div class="text-center text-muted py-4"><i class="bi bi-inbox display-6"></i><div class="mt-2">لا توجد بيانات مطابقة</div></div>';
+            return;
+        }
+
+        const bodyRows = rows.map(r => `
+            <tr>
+                <td>${r.seq}</td>
+                <td><strong>${r.registrationNumber}</strong></td>
+                <td>${this.formatDate(r.date)}</td>
+                <td>${r.type}</td>
+                <td>${r.vendor}</td>
+                <td class="text-truncate" style="max-width:260px" title="${r.description}">${r.description}</td>
+                <td class="text-success fw-bold">${this.formatCurrency(r.totalUSD, 'USD')}</td>
+                <td class="text-success">${this.formatCurrency(r.paidUSD, 'USD')}</td>
+                <td class="text-danger">${this.formatCurrency(r.remainUSD, 'USD')}</td>
+                <td class="text-primary fw-bold">${this.formatCurrency(r.totalIQD, 'IQD')}</td>
+                <td class="text-primary">${this.formatCurrency(r.paidIQD, 'IQD')}</td>
+                <td class="text-warning">${this.formatCurrency(r.remainIQD, 'IQD')}</td>
+                <td>${r.dueDate ? this.formatDate(r.dueDate) : '-'}</td>
+                <td>${r.overdueDays || 0}</td>
+                <td><span class="badge bg-${r.status==='closed'?'success':(r.status==='partial'?'warning':'secondary')}">${r.status}</span></td>
+            </tr>
+        `).join('');
+
+        wrap.innerHTML = `
+            <table class="table table-sm table-striped align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>#</th>
+                        <th>رقم القيد</th>
+                        <th>التاريخ</th>
+                        <th>النوع</th>
+                        <th>المورد</th>
+                        <th>الوصف</th>
+                        <th>إجمالي $</th>
+                        <th>مسدد $</th>
+                        <th>متبق $</th>
+                        <th>إجمالي د.ع</th>
+                        <th>مسدد د.ع</th>
+                        <th>متبق د.ع</th>
+                        <th>الاستحقاق</th>
+                        <th>أيام التأخير</th>
+                        <th>الحالة</th>
+                    </tr>
+                </thead>
+                <tbody>${bodyRows}</tbody>
+            </table>
+        `;
+    }
+
+    exportCreditPurchaseReport() {
+        // Build rows from current rendered data
+        const all = StorageManager.getAllData().creditPurchases || [];
+        const criteria = this.getCreditPurchaseReportCriteria();
+        const list = this.filterCreditPurchasesForReport(all, criteria);
+        const today = new Date();
+        const rows = list.sort((a,b)=> new Date(b.date) - new Date(a.date)).map((cp, idx) => {
+            const paid = this.computeCPPaidSums(cp);
+            const remain = this.computeCPRemaining(cp, paid);
+            const due = cp.dueDate ? new Date(cp.dueDate) : null;
+            let overdueDays = 0;
+            if (due && (cp.status !== 'closed')) {
+                const diff = Math.floor((today - due) / (1000*60*60*24));
+                overdueDays = diff > 0 ? diff : 0;
+            }
+            return {
+                seq: idx + 1,
+                reg: cp.registrationNumber,
+                date: cp.date,
+                type: cp.creditType === 'measurement' ? 'Measurement' : 'PurchaseReceipt',
+                vendor: cp.vendor || '',
+                description: (cp.description || '').replace(/[\,\n]/g,' '),
+                totalUSD: parseFloat(cp.amountUSD) || 0,
+                paidUSD: paid.usd,
+                remainUSD: remain.usd,
+                totalIQD: parseFloat(cp.amountIQD) || 0,
+                paidIQD: paid.iqd,
+                remainIQD: remain.iqd,
+                dueDate: cp.dueDate || '',
+                overdueDays,
+                status: cp.status || 'open'
+            };
+        });
+
+        const headers = ['Seq','Registration','Date','Type','Vendor','Description','TotalUSD','PaidUSD','RemainUSD','TotalIQD','PaidIQD','RemainIQD','DueDate','OverdueDays','Status'];
+        const csv = [headers.join(',')].concat(
+            rows.map(r => [r.seq,r.reg,r.date,r.type,r.vendor,r.description,r.totalUSD,r.paidUSD,r.remainUSD,r.totalIQD,r.paidIQD,r.remainIQD,r.dueDate,r.overdueDays,r.status].join(','))
+        ).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `credit_purchase_report_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click(); URL.revokeObjectURL(url);
+    }
+
+    printCreditPurchaseReport() {
+        const all = StorageManager.getAllData().creditPurchases || [];
+        const criteria = this.getCreditPurchaseReportCriteria();
+        const list = this.filterCreditPurchasesForReport(all, criteria);
+        const today = new Date();
+        const rows = list.sort((a,b)=> new Date(b.date) - new Date(a.date)).map((cp, idx) => {
+            const paid = this.computeCPPaidSums(cp);
+            const remain = this.computeCPRemaining(cp, paid);
+            const due = cp.dueDate ? new Date(cp.dueDate) : null;
+            let overdueDays = 0;
+            if (due && (cp.status !== 'closed')) {
+                const diff = Math.floor((today - due) / (1000*60*60*24));
+                overdueDays = diff > 0 ? diff : 0;
+            }
+            return {
+                seq: idx + 1,
+                reg: cp.registrationNumber,
+                date: cp.date,
+                type: cp.creditType === 'measurement' ? 'ذرعة' : 'وصل شراء',
+                vendor: cp.vendor || '-',
+                description: cp.description || '-',
+                totalUSD: parseFloat(cp.amountUSD) || 0,
+                paidUSD: paid.usd,
+                remainUSD: remain.usd,
+                totalIQD: parseFloat(cp.amountIQD) || 0,
+                paidIQD: paid.iqd,
+                remainIQD: remain.iqd,
+                dueDate: cp.dueDate || '',
+                overdueDays,
+                status: cp.status || 'open'
+            };
+        });
+
+        const tableRows = rows.map(r => `
+            <tr>
+                <td>${r.seq}</td>
+                <td>${r.reg}</td>
+                <td>${this.formatDate(r.date)}</td>
+                <td>${r.type}</td>
+                <td>${r.vendor}</td>
+                <td>${r.description}</td>
+                <td style="text-align:left">${this.formatCurrency(r.totalUSD,'USD')}</td>
+                <td style="text-align:left">${this.formatCurrency(r.paidUSD,'USD')}</td>
+                <td style="text-align:left">${this.formatCurrency(r.remainUSD,'USD')}</td>
+                <td style="text-align:left">${this.formatCurrency(r.totalIQD,'IQD')}</td>
+                <td style="text-align:left">${this.formatCurrency(r.paidIQD,'IQD')}</td>
+                <td style="text-align:left">${this.formatCurrency(r.remainIQD,'IQD')}</td>
+                <td>${r.dueDate ? this.formatDate(r.dueDate) : '-'}</td>
+                <td>${r.overdueDays}</td>
+                <td>${r.status}</td>
+            </tr>
+        `).join('');
+
+        const totals = rows.reduce((a, r) => {
+            a.totalUSD += r.totalUSD; a.totalIQD += r.totalIQD;
+            a.remainUSD += r.remainUSD; a.remainIQD += r.remainIQD; return a;
+        }, { totalUSD: 0, totalIQD: 0, remainUSD: 0, remainIQD: 0 });
+
+        const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('تقرير الشراء بالآجل') : '';
+        const footer = (typeof buildPrintFooterHTML === 'function') ? buildPrintFooterHTML() : '';
+        const html = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>تقرير الشراء بالآجل</title>
+        <style>
+            @page { size: A4 landscape; margin: 10mm; }
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; font-family: 'Cairo','Tahoma','Arial',sans-serif; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th, td { border: 1px solid #333; padding: 4px 6px; }
+            thead { display: table-header-group; }
+            .summary { margin: 8px 0 12px; display: flex; gap: 12px; }
+            .card { border: 1px solid #ddd; border-radius: 8px; padding: 8px 12px; min-width: 220px; background: #fff; }
+            .muted { color: #6c757d; font-size: 12px; margin-bottom: 4px; }
+            .bold { font-weight: 700; }
+        </style>
+        </head><body>
+            ${header}
+            <div class="print-body">
+                <div class="summary">
+                    <div class="card"><div class="muted">إجمالي الدولار</div><div class="bold">${this.formatCurrency(totals.totalUSD,'USD')}</div></div>
+                    <div class="card"><div class="muted">إجمالي الدينار</div><div class="bold">${this.formatCurrency(totals.totalIQD,'IQD')}</div></div>
+                    <div class="card"><div class="muted">المتبقي بالدولار</div><div class="bold">${this.formatCurrency(totals.remainUSD,'USD')}</div></div>
+                    <div class="card"><div class="muted">المتبقي بالدينار</div><div class="bold">${this.formatCurrency(totals.remainIQD,'IQD')}</div></div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th><th>رقم القيد</th><th>التاريخ</th><th>النوع</th><th>المورد</th><th>الوصف</th>
+                            <th>إجمالي $</th><th>مسدد $</th><th>متبق $</th>
+                            <th>إجمالي د.ع</th><th>مسدد د.ع</th><th>متبق د.ع</th>
+                            <th>الاستحقاق</th><th>أيام التأخير</th><th>الحالة</th>
+                        </tr>
+                    </thead>
+                    <tbody>${tableRows}</tbody>
+                </table>
+            </div>
+            ${footer}
+        </body></html>`;
+
+        const w = window.open('', '_blank', 'width=1100,height=800');
+        w.document.open();
+        w.document.write(html);
+        w.document.close();
+        w.onload = () => setTimeout(() => { try { w.print(); } catch(_){} }, 250);
     }
 
     showAddUserForm() {
