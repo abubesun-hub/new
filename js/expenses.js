@@ -1136,7 +1136,13 @@ class ExpensesManager {
         const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('كشف حساب مورد') : '';
         const footer = (typeof buildPrintFooterHTML === 'function') ? buildPrintFooterHTML() : '';
         const html = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>كشف حساب مورد</title><link rel="stylesheet" href="css/style.css">
-        <style>@page{size:A4;margin:10mm;} .table{font-size:12px;} th,td{padding:4px 6px;}</style>
+        <style>
+            /* Landscape orientation for this report only */
+            @page { size: A4 landscape; margin: 10mm; }
+            @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+            .table{font-size:12px;} th,td{padding:4px 6px;}
+            .receipt-body{max-width:100%;}
+        </style>
         </head><body>${header}<div class="receipt-body">${content}</div>${footer}</body></html>`;
         const w = window.open('', '_blank', 'width=900,height=700');
         w.document.write(html); w.document.close(); w.onload = ()=> setTimeout(()=>{ try{ w.print(); }catch(_){ } }, 200);
