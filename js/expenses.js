@@ -273,6 +273,7 @@ class ExpensesManager {
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h4 class="mb-0"><i class="bi bi-wallet2 me-2"></i>تسديد مبالغ الشراء بالآجل</h4>
                 <div class="d-flex gap-2 align-items-center">
+                    <button type="button" class="btn btn-outline-dark btn-sm" title="كشف حساب مورد" onclick="expensesManager.openVendorStatementPanel()"><i class="bi bi-receipt"></i> كشف حساب</button>
                     <select id="cpSettlFilterVendor" class="form-select form-select-sm" style="min-width:220px">
                         <option value="">كل الموردين</option>
                     </select>
@@ -424,8 +425,9 @@ class ExpensesManager {
                     </div>
                 </div>
             </div>
-            <!-- Panels: Payments History -->
+            <!-- Panels: Payments History & Vendor Statement -->
             <div id="cpPaymentsHistoryPanel" style="display:none" class="mt-3"></div>
+            <div id="cpVendorStatementPanel" style="display:none" class="mt-3"></div>
         </div>`;
     }
 
@@ -917,6 +919,193 @@ class ExpensesManager {
         };
         const newEntry = StorageManager.addExpenseEntry(expense);
         if(!newEntry){ console.warn('Failed to create expense for payment'); }
+    }
+
+    // ====== كشف حساب مورد ======
+    openVendorStatementPanel(){
+        const panel = document.getElementById('cpVendorStatementPanel');
+        if(!panel) return;
+        // اجمع قائمة الموردين للفلاتر
+        const suppliers = this.getCreditPurchaseSuppliers();
+        const vendorOptions = ['<option value="">اختر المورد</option>']
+            .concat(suppliers.map(s=>`<option value="${s.id}">${s.name}</option>`)).join('');
+        const html = `
+            <div class="neumorphic-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="bi bi-receipt me-1"></i>كشف حساب مورد</h6>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('cpVendorStatementPanel').style.display='none'"><i class="bi bi-x"></i></button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2 align-items-end mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label small">المورد</label>
+                            <select id="vsVendor" class="form-select form-select-sm">${vendorOptions}</select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small">من تاريخ</label>
+                            <input type="date" id="vsFrom" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small">إلى تاريخ</label>
+                            <input type="date" id="vsTo" class="form-control form-control-sm" value="${new Date().toISOString().split('T')[0]}">
+                        </div>
+                        <div class="col-md-2 d-flex gap-2">
+                            <button class="btn btn-sm btn-primary w-100" onclick="expensesManager.runVendorStatement()"><i class="bi bi-search"></i></button>
+                        </div>
+                    </div>
+                    <div id="vsResult"></div>
+                </div>
+            </div>`;
+        panel.innerHTML = html;
+        panel.style.display = 'block';
+    }
+
+    runVendorStatement(){
+        const vendorId = document.getElementById('vsVendor')?.value || '';
+        if(!vendorId){ alert('اختر المورد أولاً'); return; }
+        const from = document.getElementById('vsFrom')?.value || '';
+        const to = document.getElementById('vsTo')?.value || '';
+        const data = this.buildVendorStatementData({vendorId, from, to});
+        this.renderVendorStatement(data);
+    }
+
+    buildVendorStatementData({vendorId, from, to}){
+        const vendors = this.getCreditPurchaseSuppliers();
+        const vendor = vendors.find(v=>v.id===vendorId);
+        const list = StorageManager.getData(StorageManager.STORAGE_KEYS.CREDIT_PURCHASES) || [];
+        const inRange = (d)=>{
+            const dt = new Date(d);
+            if(from && dt < new Date(from)) return false;
+            if(to && dt > new Date(to)+1) return false;
+            return true;
+        };
+        // عناصر البيان: مشتريات (Invoice/Measurement) ودفعات
+        const rows = [];
+        list.filter(cp => (cp.vendorId||'')===vendorId).forEach(cp=>{
+            // عملية الشراء نفسها كمدين على المورد
+            const isMeas = (cp.creditType||'invoice') !== 'invoice';
+            rows.push({
+                type: isMeas ? 'ذرعة' : 'فاتورة',
+                registrationNumber: cp.registrationNumber,
+                date: cp.date,
+                description: cp.description || (isMeas?'ذرعة محتسبة':'فاتورة شراء'),
+                usd: cp.amountUSD||0,
+                iqd: cp.amountIQD||0,
+                exRate: cp.exchangeRate||1500,
+                dir: 'debit' // على المورد
+            });
+            // دفعات مسجلة ضمن هذا القيد
+            (cp.payments||[]).forEach(p=>{
+                rows.push({
+                    type: 'دفعة',
+                    registrationNumber: cp.registrationNumber,
+                    date: p.date,
+                    description: p.notes || p.reference || 'دفعة تسديد',
+                    usd: p.amountUSD||0,
+                    iqd: p.amountIQD||0,
+                    exRate: p.exchangeRate||cp.exchangeRate||1500,
+                    dir: 'credit' // لصالح المورد (تسديد)
+                });
+            });
+        });
+        // فرز حسب التاريخ
+        rows.sort((a,b)=> new Date(a.date) - new Date(b.date));
+        // تصفية بالتاريخ
+        const filtered = rows.filter(r=> inRange(r.date));
+        // أرصدة جارية عملة مزدوجة
+        let balUSD = 0, balIQD = 0;
+        const withRun = filtered.map(r=>{
+            if(r.dir==='debit'){ balUSD += (r.usd||0); balIQD += (r.iqd||0); }
+            else { balUSD -= (r.usd||0); balIQD -= (r.iqd||0); }
+            return {...r, balUSD, balIQD};
+        });
+        const opening = { balUSD: 0, balIQD: 0 };
+        // ملخص
+        const totals = withRun.reduce((acc,r)=>{
+            if(r.dir==='debit'){ acc.purchUSD+=r.usd; acc.purchIQD+=r.iqd; } else { acc.payUSD+=r.usd; acc.payIQD+=r.iqd; }
+            return acc;
+        },{purchUSD:0,purchIQD:0,payUSD:0,payIQD:0});
+        const balance = { usd: balUSD, iqd: balIQD };
+        return { vendorName: vendor?vendor.name:'', vendorId, from, to, rows: withRun, opening, totals, balance };
+    }
+
+    renderVendorStatement(stmt){
+        const el = document.getElementById('vsResult'); if(!el) return;
+        const dateRange = [stmt.from||'—', stmt.to||'—'].join(' إلى ');
+        const head = `<div class="d-flex justify-content-between align-items-center mb-2">
+            <div>
+                <div class="fw-bold">المورد: ${stmt.vendorName||'-'}</div>
+                <div class="text-muted small">الفترة: ${dateRange}</div>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-secondary" onclick="expensesManager.exportVendorStatement()"><i class="bi bi-download"></i> تصدير CSV</button>
+                <button class="btn btn-sm btn-outline-primary" onclick="expensesManager.printVendorStatement()"><i class="bi bi-printer"></i> طباعة</button>
+            </div>
+        </div>`;
+        const rows = stmt.rows.map(r=>`<tr>
+            <td>${this.formatDate(r.date)}</td>
+            <td>${r.type}</td>
+            <td>${r.registrationNumber}</td>
+            <td>${r.description||''}</td>
+            <td>${this.formatCurrency(r.usd,'USD')}</td>
+            <td>${this.formatCurrency(r.iqd,'IQD')}</td>
+            <td>${this.formatCurrency(r.balUSD,'USD')}</td>
+            <td>${this.formatCurrency(r.balIQD,'IQD')}</td>
+        </tr>`).join('') || `<tr><td colspan="8" class="text-center text-muted">لا بيانات ضمن الفترة</td></tr>`;
+        const summary = `<div class="row g-2 my-2">
+            <div class="col-md-3"><div class="border rounded p-2 bg-light">إجمالي المشتريات: ${this.formatCurrency(stmt.totals.purchUSD,'USD')} | ${this.formatCurrency(stmt.totals.purchIQD,'IQD')}</div></div>
+            <div class="col-md-3"><div class="border rounded p-2 bg-light">إجمالي الدفعات: ${this.formatCurrency(stmt.totals.payUSD,'USD')} | ${this.formatCurrency(stmt.totals.payIQD,'IQD')}</div></div>
+            <div class="col-md-3"><div class="border rounded p-2 bg-light">الرصيد النهائي: ${this.formatCurrency(stmt.balance.usd,'USD')} | ${this.formatCurrency(stmt.balance.iqd,'IQD')}</div></div>
+        </div>`;
+        el.innerHTML = `${head}<div class="table-responsive"><table class="table table-sm table-striped align-middle"><thead>
+            <tr><th>التاريخ</th><th>نوع العملية</th><th>القيد</th><th>الوصف</th><th>مدين USD</th><th>مدين IQD</th><th>الرصيد USD</th><th>الرصيد IQD</th></tr>
+        </thead><tbody>${rows}</tbody></table></div>${summary}`;
+        // خزّن آخر بيان لحاجات الطباعة/التصدير
+        this._lastVendorStatement = stmt;
+    }
+
+    exportVendorStatement(){
+        const stmt = this._lastVendorStatement; if(!stmt){ alert('شغّل كشف الحساب أولاً'); return; }
+        const headers = ['Date','Type','Registration','Description','USD','IQD','RunningUSD','RunningIQD'];
+        const csvRows = [headers.join(',')].concat(
+            stmt.rows.map(r=>[
+                this.formatDate(r.date), r.type, r.registrationNumber, (r.description||'').replace(/[,\n]/g,' '), r.usd, r.iqd, r.balUSD, r.balIQD
+            ].join(','))
+        );
+        const blob = new Blob([csvRows.join('\n')], {type:'text/csv;charset=utf-8;'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `vendor_statement_${stmt.vendorId}_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    }
+
+    printVendorStatement(){
+        const stmt = this._lastVendorStatement; if(!stmt){ alert('شغّل كشف الحساب أولاً'); return; }
+        const tableRows = stmt.rows.map(r=>`<tr>
+            <td>${this.formatDate(r.date)}</td><td>${r.type}</td><td>${r.registrationNumber}</td><td>${r.description||''}</td>
+            <td style="text-align:left">${this.formatCurrency(r.usd,'USD')}</td><td style="text-align:left">${this.formatCurrency(r.iqd,'IQD')}</td>
+            <td style="text-align:left">${this.formatCurrency(r.balUSD,'USD')}</td><td style="text-align:left">${this.formatCurrency(r.balIQD,'IQD')}</td>
+        </tr>`).join('');
+        const content = `
+            <h3 class="mb-1">كشف حساب مورد</h3>
+            <div class="mb-2 small">المورد: ${stmt.vendorName || '-'} | الفترة: ${(stmt.from||'—')} إلى ${(stmt.to||'—')}</div>
+            <table class="table table-sm table-striped" style="width:100%">
+                <thead><tr><th>التاريخ</th><th>نوع العملية</th><th>القيد</th><th>الوصف</th><th>مدين USD</th><th>مدين IQD</th><th>الرصيد USD</th><th>الرصيد IQD</th></tr></thead>
+                <tbody>${tableRows}</tbody>
+            </table>
+            <div class="mt-2">إجمالي المشتريات: ${this.formatCurrency(stmt.totals.purchUSD,'USD')} | ${this.formatCurrency(stmt.totals.purchIQD,'IQD')}</div>
+            <div>إجمالي الدفعات: ${this.formatCurrency(stmt.totals.payUSD,'USD')} | ${this.formatCurrency(stmt.totals.payIQD,'IQD')}</div>
+            <div class="fw-bold">الرصيد النهائي: ${this.formatCurrency(stmt.balance.usd,'USD')} | ${this.formatCurrency(stmt.balance.iqd,'IQD')}</div>
+        `;
+        const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('كشف حساب مورد') : '';
+        const footer = (typeof buildPrintFooterHTML === 'function') ? buildPrintFooterHTML() : '';
+        const html = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>كشف حساب مورد</title><link rel="stylesheet" href="css/style.css">
+        <style>@page{size:A4;margin:10mm;} .table{font-size:12px;} th,td{padding:4px 6px;} .print-header .program-name{display:none}</style>
+        </head><body>${header}<div class="receipt-body">${content}</div>${footer}</body></html>`;
+        const w = window.open('', '_blank', 'width=900,height=700');
+        w.document.write(html); w.document.close(); w.onload = ()=> setTimeout(()=>{ try{ w.print(); }catch(_){ } }, 200);
     }
 
     setupCreditPurchaseSuppliersHandlers(){
