@@ -1084,6 +1084,7 @@ class CapitalManager {
                         <tr>
                             <th>رقم التسجيل</th>
                             <th>المساهم</th>
+                            <th>النوع</th>
                             <th>المبلغ</th>
                             <th>العملة</th>
                             <th>التاريخ</th>
@@ -1100,6 +1101,11 @@ class CapitalManager {
                                 <tr>
                                     <td>${entry.registrationNumber}</td>
                                     <td>${shareholder ? shareholder.name : 'غير محدد'}</td>
+                                    <td>
+                                        <span class="badge ${isWithdrawal ? 'bg-warning text-dark' : 'bg-success'}">
+                                            ${isWithdrawal ? 'سحب' : 'إيداع'}
+                                        </span>
+                                    </td>
                                     <td>${sign}${this.formatCurrency(entry.amount, entry.currency)}</td>
                                     <td><span class="badge bg-${entry.currency === 'USD' ? 'success' : 'primary'}">${entry.currency}</span></td>
                                     <td>${this.formatDate(entry.date)}</td>
