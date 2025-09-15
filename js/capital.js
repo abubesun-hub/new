@@ -423,6 +423,9 @@ class CapitalManager {
                             <button type="button" class="btn btn-secondary neumorphic-btn ms-2" onclick="capitalManager.clearSearch()">
                                 <i class="bi bi-x-circle me-2"></i>مسح البحث
                             </button>
+                            <button type="button" class="btn btn-success neumorphic-btn ms-2" id="printSearchResultsBtn">
+                                <i class="bi bi-printer me-2"></i>طباعة النتائج
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -471,6 +474,12 @@ class CapitalManager {
         const shareholderSelect = document.getElementById('searchShareholder');
         if (shareholderSelect) {
             shareholderSelect.addEventListener('change', () => this.performSearch());
+        }
+
+        // Print results button
+        const printBtn = document.getElementById('printSearchResultsBtn');
+        if (printBtn) {
+            printBtn.addEventListener('click', () => this.printSearchResults());
         }
     }
 
@@ -847,10 +856,34 @@ class CapitalManager {
         const form = document.getElementById('searchForm');
         if (!form) return;
 
+        // Submit handler
         form.addEventListener('submit', (e) => {
             e.preventDefault();
             this.performSearch();
         });
+
+        // Trigger search on Enter for text/date inputs
+        const inputs = form.querySelectorAll('input');
+        inputs.forEach(input => {
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.performSearch();
+                }
+            });
+        });
+
+        // Trigger search when shareholder changes (dropdown)
+        const shareholderSelect = document.getElementById('searchShareholder');
+        if (shareholderSelect) {
+            shareholderSelect.addEventListener('change', () => this.performSearch());
+        }
+
+        // Print results button
+        const printBtn = document.getElementById('printSearchResultsBtn');
+        if (printBtn) {
+            printBtn.addEventListener('click', () => this.printSearchResults());
+        }
     }
 
     // Save shareholder
@@ -1062,7 +1095,99 @@ class CapitalManager {
         };
 
         const results = StorageManager.searchCapital(searchCriteria);
+        this.lastSearchResults = results;
         this.displaySearchResults(results);
+        return results;
+    }
+
+    // Print all currently visible search results
+    printSearchResults() {
+        // Ensure we have results based on current filters
+        const results = this.performSearch() || this.lastSearchResults || [];
+        if (!results || results.length === 0) {
+            this.showNotification('لا توجد نتائج لطباعتها', 'error');
+            return;
+        }
+
+        const shareholders = StorageManager.getData(StorageManager.STORAGE_KEYS.SHAREHOLDERS) || [];
+
+        // Build printable HTML
+        const rowsHtml = results.map(entry => {
+            const shareholder = shareholders.find(s => s.id === entry.shareholderId);
+            const isWithdrawal = (entry.type || '').toLowerCase() === 'withdrawal';
+            const sign = isWithdrawal ? '-' : '';
+            const typeBadge = isWithdrawal ? 'سحب' : 'إيداع';
+            const amountStr = sign + this.formatCurrency(entry.amount, entry.currency);
+            const currencyStr = entry.currency;
+            const dateStr = this.formatDate(entry.date);
+            const receipt = entry.receiptNumber || '';
+            return `
+                <tr>
+                    <td>${entry.registrationNumber || ''}</td>
+                    <td>${shareholder ? shareholder.name : 'غير محدد'}</td>
+                    <td>${typeBadge}</td>
+                    <td>${amountStr}</td>
+                    <td>${currencyStr}</td>
+                    <td>${dateStr}</td>
+                    <td>${receipt}</td>
+                </tr>
+            `;
+        }).join('');
+
+        const styles = `
+            <style>
+                @page { size: A4 landscape; margin: 12mm; }
+                body { direction: rtl; }
+                table { width: 100%; border-collapse: collapse; }
+                thead th { background: #f3f4f6; }
+                th, td { border: 1px solid #ddd; padding: 8px; font-size: 12px; }
+                .meta { margin: 8px 0 12px; font-size: 12px; color: #555; }
+            </style>
+        `;
+
+        const title = 'تقرير نتائج بحث رأس المال';
+        const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML(title) : `<h3>${title}</h3>`;
+        const footer = (typeof buildPrintFooterHTML === 'function') ? buildPrintFooterHTML() : '';
+
+        const html = `
+            <!doctype html>
+            <html lang="ar" dir="rtl">
+            <head><meta charset="utf-8"/>${styles}</head>
+            <body>
+                ${header}
+                <div class="print-body">
+                    <div class="meta">عدد السجلات: ${results.length}</div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>رقم التسجيل</th>
+                                <th>المساهم</th>
+                                <th>النوع</th>
+                                <th>المبلغ</th>
+                                <th>العملة</th>
+                                <th>التاريخ</th>
+                                <th>رقم الإيصال</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHtml}
+                        </tbody>
+                    </table>
+                </div>
+                ${footer}
+                <script>setTimeout(function(){ window.print(); setTimeout(function(){ window.close(); }, 300); }, 200);</script>
+            </body>
+            </html>
+        `;
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            this.showNotification('تعذّر فتح نافذة الطباعة. الرجاء السماح بالنوافذ المنبثقة.', 'error');
+            return;
+        }
+        printWindow.document.open();
+        printWindow.document.write(html);
+        printWindow.document.close();
     }
 
     // Display search results
