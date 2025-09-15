@@ -472,7 +472,10 @@ class AccountingApp {
     generateCapitalReportHTML() {
         return `
             <div class="capital-report-container">
-                <!-- Report Header -->
+                <!-- Embedded: General Capital Report (by shareholder) -->
+                ${this.generateGeneralCapitalReportHTML()}
+
+                <!-- Report Header (moved just before search) -->
                 <div class="neumorphic-card mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h4><i class="bi bi-cash-stack me-2"></i>تقرير رأس المال الشامل</h4>
@@ -486,9 +489,6 @@ class AccountingApp {
                         </div>
                     </div>
                 </div>
-
-                <!-- Embedded: General Capital Report (by shareholder) -->
-                ${this.generateGeneralCapitalReportHTML()}
 
                 <!-- Search Section -->
                 <div class="neumorphic-card mb-4">
