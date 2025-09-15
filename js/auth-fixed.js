@@ -429,6 +429,40 @@ class AuthManager {
             return { success: false, message: 'حدث خطأ أثناء التعديل: ' + e.message };
         }
     }
+
+    // Delete user (admin/manager only) with safety checks
+    async deleteUser(userId) {
+        try {
+            if (!this.currentUser) {
+                return { success: false, message: 'يجب تسجيل الدخول أولاً' };
+            }
+            const role = this.currentUser.role || this.currentUser.username;
+            const isAllowed = (role === 'admin' || role === 'manager' || this.currentUser.username === 'admin' || this.currentUser.username === 'manager');
+            if (!isAllowed) {
+                return { success: false, message: 'ليس لديك صلاحية للحذف' };
+            }
+
+            let users = StorageManager.getData(StorageManager.STORAGE_KEYS.USERS) || [];
+            const idx = users.findIndex(u => u.id === userId);
+            if (idx === -1) return { success: false, message: 'المستخدم غير موجود' };
+
+            // Prevent deleting admin account
+            if (users[idx].username === 'admin') {
+                return { success: false, message: 'لا يمكن حذف حساب admin' };
+            }
+            // Prevent deleting self
+            if (this.currentUser.id && users[idx].id === this.currentUser.id) {
+                return { success: false, message: 'لا يمكن حذف حسابك الحالي' };
+            }
+
+            users.splice(idx, 1);
+            const ok = StorageManager.saveData(StorageManager.STORAGE_KEYS.USERS, users);
+            return ok ? { success: true, message: 'تم حذف المستخدم' } : { success: false, message: 'فشل حذف المستخدم' };
+        } catch (e) {
+            console.error('AuthManager.deleteUser error:', e);
+            return { success: false, message: 'حدث خطأ أثناء الحذف: ' + e.message };
+        }
+    }
 }
 
 // Create the instance immediately

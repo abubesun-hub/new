@@ -451,6 +451,9 @@ class AccountingApp {
                                                 <i class="bi bi-person-check"></i>
                                             </button>
                                         `}
+                                        <button class="btn btn-outline-danger" title="حذف" onclick="app.deleteUser('${user.id}')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
@@ -2721,6 +2724,34 @@ class AccountingApp {
                     this.showUsersList();
                     this.showNotification('تم تفعيل المستخدم', 'success');
                 }
+            }
+        }
+    }
+
+    deleteUser(userId) {
+        if (!confirm('هل أنت متأكد من حذف هذا المستخدم؟ هذا الإجراء لا يمكن التراجع عنه.')) return;
+        if (window.AuthManager && typeof window.AuthManager.deleteUser === 'function') {
+            window.AuthManager.deleteUser(userId).then(result => {
+                if (result.success) {
+                    this.showNotification(result.message, 'success');
+                    this.showUsersList();
+                } else {
+                    this.showNotification(result.message, 'error');
+                }
+            });
+        } else {
+            // Fallback direct delete
+            const users = StorageManager.getData(StorageManager.STORAGE_KEYS.USERS) || [];
+            const idx = users.findIndex(u => u.id === userId);
+            if (idx !== -1) {
+                if (users[idx].username === 'admin') {
+                    this.showNotification('لا يمكن حذف حساب admin', 'error');
+                    return;
+                }
+                users.splice(idx, 1);
+                StorageManager.saveData(StorageManager.STORAGE_KEYS.USERS, users);
+                this.showUsersList();
+                this.showNotification('تم حذف المستخدم', 'success');
             }
         }
     }
