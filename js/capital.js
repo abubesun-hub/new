@@ -407,7 +407,10 @@ class CapitalManager {
                         </div>
                         <div class="col-md-3 mb-3">
                             <label for="searchShareholder" class="form-label">اسم المساهم</label>
-                            <input type="text" class="form-control neumorphic-input" id="searchShareholder">
+                            <select class="form-control neumorphic-input" id="searchShareholder">
+                                <option value="">الكل</option>
+                                ${(StorageManager.getData(StorageManager.STORAGE_KEYS.SHAREHOLDERS) || []).map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
+                            </select>
                         </div>
                         <div class="col-md-3 mb-3">
                             <label for="searchReceiptNumber" class="form-label">رقم الإيصال</label>
@@ -453,7 +456,7 @@ class CapitalManager {
             this.performSearch();
         });
 
-        // Enter key on inputs triggers search consistently
+        // Trigger search on Enter for text/date inputs
         const inputs = form.querySelectorAll('input');
         inputs.forEach(input => {
             input.addEventListener('keydown', (e) => {
@@ -463,6 +466,12 @@ class CapitalManager {
                 }
             });
         });
+
+        // Trigger search when shareholder changes (dropdown)
+        const shareholderSelect = document.getElementById('searchShareholder');
+        if (shareholderSelect) {
+            shareholderSelect.addEventListener('change', () => this.performSearch());
+        }
     }
 
     // Calculate capital statistics
@@ -1048,20 +1057,9 @@ class CapitalManager {
         const searchCriteria = {
             registrationNumber: document.getElementById('searchRegistrationNumber').value,
             date: document.getElementById('searchDate').value,
-            receiptNumber: document.getElementById('searchReceiptNumber').value
+            receiptNumber: document.getElementById('searchReceiptNumber').value,
+            shareholderId: document.getElementById('searchShareholder').value
         };
-
-        const shareholderName = document.getElementById('searchShareholder').value;
-        if (shareholderName) {
-            // Find shareholder by name
-            const shareholders = StorageManager.getData(StorageManager.STORAGE_KEYS.SHAREHOLDERS) || [];
-            const shareholder = shareholders.find(s =>
-                s.name.toLowerCase().includes(shareholderName.toLowerCase())
-            );
-            if (shareholder) {
-                searchCriteria.shareholderId = shareholder.id;
-            }
-        }
 
         const results = StorageManager.searchCapital(searchCriteria);
         this.displaySearchResults(results);
