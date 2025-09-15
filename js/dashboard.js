@@ -70,10 +70,12 @@ class DashboardManager {
             profitMargin: 0
         };
 
-        // Calculate capital totals
+        // Calculate capital totals (withdrawals reduce totals)
         if (data.capital) {
             data.capital.forEach(entry => {
-                const amount = parseFloat(entry.amount) || 0;
+                const raw = parseFloat(entry.amount) || 0;
+                const isWithdrawal = (entry.type || '').toLowerCase() === 'withdrawal';
+                const amount = isWithdrawal ? -Math.abs(raw) : Math.abs(raw);
                 if (entry.currency === 'USD') {
                     stats.capital.USD += amount;
                 } else if (entry.currency === 'IQD') {
@@ -138,8 +140,9 @@ class DashboardManager {
         if (data.capital) {
             data.capital.forEach(entry => {
                 const entryDate = new Date(entry.date);
-                const amount = parseFloat(entry.amount) || 0;
-                
+                const raw = parseFloat(entry.amount) || 0;
+                const isWithdrawal = (entry.type || '').toLowerCase() === 'withdrawal';
+                const amount = isWithdrawal ? -Math.abs(raw) : Math.abs(raw);
                 if (entryDate.getMonth() === currentMonth) {
                     currentMonthTotal += amount;
                 } else if (entryDate.getMonth() === lastMonth) {
@@ -195,7 +198,8 @@ class DashboardManager {
                 data.capital.map(t => ({ 
                     ...t, 
                     type: 'رأس مال',
-                    typeClass: 'success',
+                    capitalType: t.type, // preserve deposit/withdrawal
+                    typeClass: (t.type || '').toLowerCase() === 'withdrawal' ? 'warning' : 'success',
                     icon: 'cash-stack'
                 }))
             );
@@ -258,7 +262,15 @@ class DashboardManager {
                                         ${transaction.type}
                                     </span>
                                 </td>
-                                <td class="fw-bold">${this.formatCurrency((transaction.amountUSD!==undefined?transaction.amountUSD: (transaction.amountIQD!==undefined?transaction.amountIQD: transaction.amount)), (transaction.amountUSD!==undefined?'USD': (transaction.amountIQD!==undefined?'IQD': transaction.currency)))}</td>
+                                <td class="fw-bold">${(() => {
+                                    const hasUSD = transaction.amountUSD !== undefined;
+                                    const hasIQD = transaction.amountIQD !== undefined;
+                                    const rawAmt = hasUSD ? parseFloat(transaction.amountUSD) || 0 : (hasIQD ? parseFloat(transaction.amountIQD) || 0 : (parseFloat(transaction.amount) || 0));
+                                    const curr = hasUSD ? 'USD' : (hasIQD ? 'IQD' : transaction.currency);
+                                    const isWithdrawal = (transaction.capitalType || '').toLowerCase() === 'withdrawal';
+                                    const signed = isWithdrawal ? -Math.abs(rawAmt) : rawAmt;
+                                    return this.formatCurrency(signed, curr);
+                                })()}</td>
                                 <td>
                                     <span class="badge bg-secondary">${transaction.currency}</span>
                                 </td>
@@ -340,16 +352,18 @@ class DashboardManager {
             data.capital.forEach(entry => {
                 const date = new Date(entry.date);
                 const month = date.getMonth();
-                const amount = parseFloat(entry.amount) || 0;
+                const raw = parseFloat(entry.amount) || 0;
+                const isWithdrawal = (entry.type || '').toLowerCase() === 'withdrawal';
+                const amount = isWithdrawal ? -Math.abs(raw) : Math.abs(raw);
                 monthlyTotals[month] += amount;
-                maxAmount = Math.max(maxAmount, monthlyTotals[month]);
+                maxAmount = Math.max(maxAmount, Math.abs(monthlyTotals[month]));
             });
         }
 
         return months.map((name, index) => ({
             name,
             amount: monthlyTotals[index],
-            percentage: maxAmount > 0 ? (monthlyTotals[index] / maxAmount) * 100 : 0
+            percentage: maxAmount > 0 ? (Math.abs(monthlyTotals[index]) / maxAmount) * 100 : 0
         }));
     }
 

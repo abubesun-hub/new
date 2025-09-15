@@ -259,6 +259,8 @@ class StorageManager {
         const newEntry = {
             id: this.generateId(),
             registrationNumber: this.generateRegistrationNumber(),
+            // default to deposit if not provided
+            type: (capitalData && capitalData.type) ? capitalData.type : 'deposit',
             ...capitalData,
             createdAt: new Date().toISOString()
         };

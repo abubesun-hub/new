@@ -631,7 +631,7 @@ class AccountingApp {
         });
     }
 
-    // Calculate capital totals
+    // Calculate capital totals (withdrawals reduce totals)
     calculateCapitalTotals(capital) {
         const totals = {
             USD: 0,
@@ -640,7 +640,9 @@ class AccountingApp {
         };
 
         capital.forEach(entry => {
-            const amount = parseFloat(entry.amount) || 0;
+            const raw = parseFloat(entry.amount) || 0;
+            const isWithdrawal = (entry.type || '').toLowerCase() === 'withdrawal';
+            const amount = isWithdrawal ? -Math.abs(raw) : Math.abs(raw);
             if (entry.currency === 'USD') {
                 totals.USD += amount;
             } else if (entry.currency === 'IQD') {
@@ -712,8 +714,12 @@ class AccountingApp {
             const shareholder = shareholders.find(s => s.id === entry.shareholderId);
             const shareholderName = shareholder ? shareholder.name : 'غير محدد';
 
-            const usdAmount = entry.currency === 'USD' ? parseFloat(entry.amount) : 0;
-            const iqdAmount = entry.currency === 'IQD' ? parseFloat(entry.amount) : 0;
+            const raw = parseFloat(entry.amount) || 0;
+            const isWithdrawal = (entry.type || '').toLowerCase() === 'withdrawal';
+            const signed = isWithdrawal ? -Math.abs(raw) : Math.abs(raw);
+
+            const usdAmount = entry.currency === 'USD' ? signed : 0;
+            const iqdAmount = entry.currency === 'IQD' ? signed : 0;
 
             totalUSD += usdAmount;
             totalIQD += iqdAmount;
@@ -723,8 +729,8 @@ class AccountingApp {
                     <td><strong>${entry.registrationNumber}</strong></td>
                     <td>${this.formatDate(entry.date)}</td>
                     <td>${shareholderName}</td>
-                    <td class="text-success fw-bold">${usdAmount > 0 ? this.formatCurrency(usdAmount, 'USD') : '-'}</td>
-                    <td class="text-primary fw-bold">${iqdAmount > 0 ? this.formatCurrency(iqdAmount, 'IQD') : '-'}</td>
+                    <td class="fw-bold ${usdAmount < 0 ? 'text-danger' : 'text-success'}">${entry.currency === 'USD' ? this.formatCurrency(usdAmount, 'USD') : '-'}</td>
+                    <td class="fw-bold ${iqdAmount < 0 ? 'text-danger' : 'text-primary'}">${entry.currency === 'IQD' ? this.formatCurrency(iqdAmount, 'IQD') : '-'}</td>
                     <td>${entry.receiptNumber || '-'}</td>
                     <td>${entry.notes || '-'}</td>
                 </tr>

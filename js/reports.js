@@ -78,7 +78,9 @@ class ReportsManager {
         // Calculate capital totals
         if (data.capital) {
             data.capital.forEach(entry => {
-                const amount = parseFloat(entry.amount) || 0;
+                const amountRaw = parseFloat(entry.amount) || 0;
+                const isWithdrawal = (entry.type || '').toLowerCase() === 'withdrawal';
+                const amount = isWithdrawal ? -Math.abs(amountRaw) : Math.abs(amountRaw);
                 if (entry.currency === 'USD') {
                     financial.capital.USD += amount;
                 } else if (entry.currency === 'IQD') {
@@ -133,7 +135,9 @@ class ReportsManager {
             const shareholderMap = new Map();
             
             data.capital.forEach(entry => {
-                const amount = parseFloat(entry.amount) || 0;
+                const amountRaw = parseFloat(entry.amount) || 0;
+                const isWithdrawal = (entry.type || '').toLowerCase() === 'withdrawal';
+                const amount = isWithdrawal ? -Math.abs(amountRaw) : Math.abs(amountRaw);
                 const shareholderId = entry.shareholderId;
                 
                 if (!shareholderMap.has(shareholderId)) {
@@ -163,8 +167,10 @@ class ReportsManager {
             
             // Calculate averages
             if (data.capital.length > 0) {
-                capitalData.averageContribution.USD = capitalData.totalUSD / data.capital.filter(e => e.currency === 'USD').length || 0;
-                capitalData.averageContribution.IQD = capitalData.totalIQD / data.capital.filter(e => e.currency === 'IQD').length || 0;
+                const usdCount = data.capital.filter(e => e.currency === 'USD').length || 1;
+                const iqdCount = data.capital.filter(e => e.currency === 'IQD').length || 1;
+                capitalData.averageContribution.USD = capitalData.totalUSD / usdCount;
+                capitalData.averageContribution.IQD = capitalData.totalIQD / iqdCount;
             }
         }
 
@@ -246,7 +252,9 @@ class ReportsManager {
                 const date = new Date(entry.date);
                 const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
                 if (months[monthKey]) {
-                    const amount = parseFloat(entry.amount) || 0;
+                    const raw = parseFloat(entry.amount) || 0;
+                    const isWithdrawal = (entry.type || '').toLowerCase() === 'withdrawal';
+                    const amount = isWithdrawal ? -Math.abs(raw) : Math.abs(raw);
                     if (entry.currency === 'USD') {
                         months[monthKey].capital.USD += amount;
                     } else if (entry.currency === 'IQD') {

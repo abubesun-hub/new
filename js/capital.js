@@ -268,6 +268,13 @@ class CapitalManager {
                                    value="${StorageManager.generateRegistrationNumber()}" readonly>
                         </div>
                         <div class="col-md-6 mb-3">
+                            <label for="entryType" class="form-label">نوع العملية</label>
+                            <select class="form-control neumorphic-input" id="entryType" required>
+                                <option value="deposit" selected>إيداع رأس المال</option>
+                                <option value="withdrawal">سحب من رأس المال</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
                             <label for="shareholderSelect" class="form-label">اسم المساهم</label>
                             <select class="form-control neumorphic-input" id="shareholderSelect" required>
                                 <option value="">اختر المساهم</option>
@@ -459,7 +466,9 @@ class CapitalManager {
 
         if (data.capital) {
             data.capital.forEach(entry => {
-                const amount = parseFloat(entry.amount) || 0;
+                const raw = parseFloat(entry.amount) || 0;
+                const isWithdrawal = (entry.type || '').toLowerCase() === 'withdrawal';
+                const amount = isWithdrawal ? -Math.abs(raw) : Math.abs(raw);
                 if (entry.currency === 'USD') {
                     stats.totalUSD += amount;
                 } else if (entry.currency === 'IQD') {
@@ -481,17 +490,20 @@ class CapitalManager {
             .sort((a, b) => new Date(b.date) - new Date(a.date))
             .slice(0, 5);
 
-        return recentEntries.map(entry => `
+        return recentEntries.map(entry => {
+            const isWithdrawal = (entry.type || '').toLowerCase() === 'withdrawal';
+            const sign = isWithdrawal ? '-' : '';
+            return `
             <div class="recent-entry mb-3 p-3 border rounded">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h6 class="mb-1">${this.formatCurrency(entry.amount, entry.currency)}</h6>
+                        <h6 class="mb-1">${sign}${this.formatCurrency(entry.amount, entry.currency)}</h6>
                         <small class="text-muted">${this.formatDate(entry.date)}</small>
                     </div>
                     <span class="badge bg-${entry.currency === 'USD' ? 'success' : 'primary'}">${entry.currency}</span>
                 </div>
-            </div>
-        `).join('');
+            </div>`;
+        }).join('');
     }
 
     // Render shareholders distribution
@@ -514,7 +526,9 @@ class CapitalManager {
             let totalIQD = 0;
 
             contributions.forEach(contribution => {
-                const amount = parseFloat(contribution.amount) || 0;
+                const raw = parseFloat(contribution.amount) || 0;
+                const isWithdrawal = (contribution.type || '').toLowerCase() === 'withdrawal';
+                const amount = isWithdrawal ? -Math.abs(raw) : Math.abs(raw);
                 if (contribution.currency === 'USD') {
                     totalUSD += amount;
                 } else if (contribution.currency === 'IQD') {
@@ -530,9 +544,10 @@ class CapitalManager {
             };
         });
 
-        // Compute total combined capital in IQD (convert USD -> IQD) for percentage calculations
+        // Compute total combined capital in IQD (only positive nets) for percentage calculations
         const totalCombinedIQD = shareholderContributions.reduce((sum, s) => {
-            return sum + (parseFloat(s.totalIQD) || 0) + ((parseFloat(s.totalUSD) || 0) * usdToIqd);
+            const combined = (parseFloat(s.totalIQD) || 0) + ((parseFloat(s.totalUSD) || 0) * usdToIqd);
+            return sum + Math.max(0, combined);
         }, 0);
 
         return `
@@ -643,11 +658,13 @@ class CapitalManager {
                     <tbody>
                         ${recentEntries.map(entry => {
                             const shareholder = shareholders.find(s => s.id === entry.shareholderId);
+                            const isWithdrawal = (entry.type || '').toLowerCase() === 'withdrawal';
+                            const sign = isWithdrawal ? '-' : '';
                             return `
                                 <tr>
                                     <td>${entry.registrationNumber}</td>
                                     <td>${shareholder ? shareholder.name : 'غير محدد'}</td>
-                                    <td>${this.formatCurrency(entry.amount, entry.currency)}</td>
+                                    <td>${sign}${this.formatCurrency(entry.amount, entry.currency)}</td>
                                     <td><span class="badge bg-${entry.currency === 'USD' ? 'success' : 'primary'}">${entry.currency}</span></td>
                                     <td>${this.formatDate(entry.date)}</td>
                                     <td>
@@ -817,6 +834,7 @@ class CapitalManager {
     // Save capital entry
     saveCapitalEntry() {
         const capitalData = {
+            type: document.getElementById('entryType').value,
             shareholderId: document.getElementById('shareholderSelect').value,
             currency: document.getElementById('currencyType').value,
             amount: document.getElementById('capitalAmount').value,
@@ -824,6 +842,22 @@ class CapitalManager {
             receiptNumber: document.getElementById('receiptNumber').value,
             notes: document.getElementById('capitalNotes').value
         };
+
+        // Validation
+        const amt = parseFloat(capitalData.amount) || 0;
+        if (!capitalData.shareholderId) { this.showNotification('الرجاء اختيار المساهم', 'error'); return; }
+        if (!capitalData.currency) { this.showNotification('الرجاء اختيار العملة', 'error'); return; }
+        if (amt <= 0) { this.showNotification('الرجاء إدخال مبلغ صحيح', 'error'); return; }
+
+        // Prevent overdraft on withdrawals
+        if ((capitalData.type || 'deposit') === 'withdrawal') {
+            const bal = this.getShareholderCapitalBalance(capitalData.shareholderId);
+            const available = capitalData.currency === 'USD' ? (bal.USD || 0) : (bal.IQD || 0);
+            if (amt > available) {
+                this.showNotification('لا يمكن سحب مبلغ أكبر من رصيد رأس المال المتاح للمساهم بهذه العملة', 'error');
+                return;
+            }
+        }
 
         if (this.editingId) {
             // Update existing entry
@@ -851,6 +885,21 @@ class CapitalManager {
         document.getElementById('capitalEntryForm').reset();
         document.getElementById('registrationNumber').value = StorageManager.generateRegistrationNumber();
         this.refreshCurrentView();
+    }
+
+    // Compute shareholder net capital balance (deposits - withdrawals)
+    getShareholderCapitalBalance(shareholderId) {
+        const capital = StorageManager.getData(StorageManager.STORAGE_KEYS.CAPITAL) || [];
+        const entries = capital.filter(e => e.shareholderId === shareholderId);
+        const res = { USD: 0, IQD: 0 };
+        entries.forEach(e => {
+            const raw = parseFloat(e.amount) || 0;
+            const isWithdrawal = (e.type || '').toLowerCase() === 'withdrawal';
+            const sign = isWithdrawal ? -1 : 1;
+            if (e.currency === 'USD') res.USD += sign * Math.abs(raw);
+            else if (e.currency === 'IQD') res.IQD += sign * Math.abs(raw);
+        });
+        return res;
     }
 
     // Show print button after successful save
@@ -923,6 +972,7 @@ class CapitalManager {
         // Fill form with entry data
         setTimeout(() => {
             document.getElementById('registrationNumber').value = entry.registrationNumber;
+            document.getElementById('entryType').value = entry.type || 'deposit';
             document.getElementById('shareholderSelect').value = entry.shareholderId;
             document.getElementById('currencyType').value = entry.currency;
             document.getElementById('capitalAmount').value = entry.amount;
@@ -1000,11 +1050,13 @@ class CapitalManager {
                     <tbody>
                         ${results.map(entry => {
                             const shareholder = shareholders.find(s => s.id === entry.shareholderId);
+                            const isWithdrawal = (entry.type || '').toLowerCase() === 'withdrawal';
+                            const sign = isWithdrawal ? '-' : '';
                             return `
                                 <tr>
                                     <td>${entry.registrationNumber}</td>
                                     <td>${shareholder ? shareholder.name : 'غير محدد'}</td>
-                                    <td>${this.formatCurrency(entry.amount, entry.currency)}</td>
+                                    <td>${sign}${this.formatCurrency(entry.amount, entry.currency)}</td>
                                     <td><span class="badge bg-${entry.currency === 'USD' ? 'success' : 'primary'}">${entry.currency}</span></td>
                                     <td>${this.formatDate(entry.date)}</td>
                                     <td>${entry.receiptNumber}</td>
@@ -1130,8 +1182,9 @@ class CapitalManager {
         const shareholder = shareholders.find(s => s.id === this.lastSavedEntry.shareholderId);
 
         const receiptBody = this.generateReceiptHTML(this.lastSavedEntry, shareholder);
-    // Insert the branded header created in print-utils with the receipt title
-    const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('ايصال ادخال رأس المال') : '';
+        const title = ((this.lastSavedEntry.type||'deposit')==='withdrawal') ? 'ايصال سحب من رأس المال' : 'ايصال ادخال رأس المال';
+        // Insert the branded header created in print-utils with the receipt title
+        const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML(title) : '';
 
         const fullHTML = `
             <!DOCTYPE html>
@@ -1176,8 +1229,9 @@ class CapitalManager {
         const shareholder = shareholders.find(s => s.id === entry.shareholderId);
 
         const receiptBody = this.generateReceiptHTML(entry, shareholder);
-    // Insert the branded header (logo/program/company) with the receipt title
-    const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('ايصال ادخال رأس المال') : '';
+        const title = ((entry.type||'deposit')==='withdrawal') ? 'ايصال سحب من رأس المال' : 'ايصال ادخال رأس المال';
+        // Insert the branded header (logo/program/company) with the receipt title
+        const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML(title) : '';
 
         const fullHTML = `
             <!DOCTYPE html>
@@ -1212,6 +1266,7 @@ class CapitalManager {
     generateReceiptHTML(entry, shareholder) {
         const currentDate = new Date().toLocaleDateString('ar-IQ');
         const currentTime = new Date().toLocaleTimeString('ar-IQ');
+        const isWithdrawal = ((entry.type||'deposit')==='withdrawal');
 
         return `
         <!DOCTYPE html>
@@ -1345,7 +1400,7 @@ class CapitalManager {
                 <!-- Header -->
                 <div class="header">
                     <div class="company-name">شركة المقاولات المتقدمة</div>
-                    <div class="receipt-title">إيصال إدخال رأس المال</div>
+                    <div class="receipt-title">${isWithdrawal ? 'إيصال سحب من رأس المال' : 'إيصال إدخال رأس المال'}</div>
                     <div class="receipt-number">رقم الإيصال: ${entry.registrationNumber}</div>
                 </div>
 
@@ -1367,7 +1422,7 @@ class CapitalManager {
                     </div>
 
                     <div class="info-row">
-                        <span class="info-label">تاريخ الإيداع:</span>
+                        <span class="info-label">${isWithdrawal ? 'تاريخ السحب:' : 'تاريخ الإيداع:'}</span>
                         <span class="info-value">${this.formatDate(entry.date)}</span>
                     </div>
 
@@ -1383,8 +1438,8 @@ class CapitalManager {
 
                     <!-- Amount Section -->
                     <div class="amount-section">
-                        <div class="amount-label">المبلغ المودع</div>
-                        <div class="amount-value">${this.formatCurrency(entry.amount, entry.currency)}</div>
+                        <div class="amount-label">${isWithdrawal ? 'المبلغ المسحوب' : 'المبلغ المودع'}</div>
+                        <div class="amount-value">${isWithdrawal ? '-' : ''}${this.formatCurrency(entry.amount, entry.currency)}</div>
                         <div class="amount-words">${this.numberToWords(entry.amount, entry.currency)}</div>
                     </div>
 
