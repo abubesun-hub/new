@@ -2568,6 +2568,8 @@ class AccountingApp {
         let revenueIQD = 0;
         let expensesUSD = 0;
         let expensesIQD = 0;
+        let creditRemainUSD = 0;
+        let creditRemainIQD = 0;
 
         // Calculate capital totals
         if (data.capital) {
@@ -2599,21 +2601,39 @@ class AccountingApp {
         const remainingUSD = totalUSD - expensesUSD;
         const remainingIQD = totalIQD - expensesIQD;
 
+        // Calculate credit purchases remaining (link to report logic)
+        try {
+            const cps = data.creditPurchases || [];
+            for (const cp of cps) {
+                const totalCpUSD = parseFloat(cp.amountUSD) || 0;
+                const totalCpIQD = parseFloat(cp.amountIQD) || 0;
+                const pays = Array.isArray(cp.payments) ? cp.payments : [];
+                const paidUSD = pays.reduce((a,p)=> a + (parseFloat(p.amountUSD)||0), 0);
+                const paidIQD = pays.reduce((a,p)=> a + (parseFloat(p.amountIQD)||0), 0);
+                creditRemainUSD += Math.max(0, totalCpUSD - paidUSD);
+                creditRemainIQD += Math.max(0, totalCpIQD - paidIQD);
+            }
+        } catch (e) { console.warn('credit purchases calc failed', e); }
+
         return {
             totalUSD: remainingUSD,
             totalIQD: remainingIQD,
             revenueUSD,
             revenueIQD,
             expensesUSD,
-            expensesIQD
+            expensesIQD,
+            creditRemainUSD,
+            creditRemainIQD
         };
     }
 
     updateStatisticsCards(totals) {
-        const totalUSDElement = document.getElementById('totalUSD');
-        const totalIQDElement = document.getElementById('totalIQD');
-        const totalRevenueElement = document.getElementById('totalRevenue');
-        const totalExpensesElement = document.getElementById('totalExpenses');
+    const totalUSDElement = document.getElementById('totalUSD');
+    const totalIQDElement = document.getElementById('totalIQD');
+    const totalRevenueElement = document.getElementById('totalRevenue');
+    const totalExpensesElement = document.getElementById('totalExpenses');
+    const creditRemainUSDElement = document.getElementById('creditRemainUSD');
+    const creditRemainIQDElement = document.getElementById('creditRemainIQD');
 
         if (totalUSDElement) {
             totalUSDElement.textContent = this.formatCurrency(totals.totalUSD, 'USD');
@@ -2626,6 +2646,12 @@ class AccountingApp {
         }
         if (totalExpensesElement) {
             totalExpensesElement.textContent = this.formatCurrency(totals.expensesUSD, 'USD');
+        }
+        if (creditRemainUSDElement) {
+            creditRemainUSDElement.textContent = this.formatCurrency(totals.creditRemainUSD, 'USD');
+        }
+        if (creditRemainIQDElement) {
+            creditRemainIQDElement.textContent = this.formatCurrency(totals.creditRemainIQD, 'IQD');
         }
     }
 
