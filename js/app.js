@@ -1963,6 +1963,40 @@ class AccountingApp {
             </tr>
         `).join('');
 
+        // Totals across all vendors
+        const totals = list.reduce((a,v)=>{
+            a.totalUSD += v.totalUSD; a.paidUSD += v.paidUSD; a.remainUSD += v.remainUSD;
+            a.totalIQD += v.totalIQD; a.paidIQD += v.paidIQD; a.remainIQD += v.remainIQD; return a;
+        }, { totalUSD:0, paidUSD:0, remainUSD:0, totalIQD:0, paidIQD:0, remainIQD:0 });
+
+        const totalsHTML = `
+            <div class="row g-3 mt-3">
+                <div class="col-lg-3 col-md-6">
+                    <div class="neumorphic-card text-center p-3">
+                        <div class="text-muted">إجمالي الدولار</div>
+                        <div class="fw-bold text-success">${this.formatCurrency(totals.totalUSD,'USD')}</div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="neumorphic-card text-center p-3">
+                        <div class="text-muted">إجمالي الدينار</div>
+                        <div class="fw-bold text-primary">${this.formatCurrency(totals.totalIQD,'IQD')}</div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="neumorphic-card text-center p-3">
+                        <div class="text-muted">المتبقي بالدولار</div>
+                        <div class="fw-bold text-danger">${this.formatCurrency(totals.remainUSD,'USD')}</div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="neumorphic-card text-center p-3">
+                        <div class="text-muted">المتبقي بالدينار</div>
+                        <div class="fw-bold text-warning">${this.formatCurrency(totals.remainIQD,'IQD')}</div>
+                    </div>
+                </div>
+            </div>`;
+
         wrap.innerHTML = `
             <table class="table table-sm table-striped align-middle">
                 <thead class="table-light">
@@ -1978,7 +2012,8 @@ class AccountingApp {
                     </tr>
                 </thead>
                 <tbody>${body}</tbody>
-            </table>`;
+            </table>
+            ${totalsHTML}`;
 
         const cnt = document.getElementById('cprVendorAggCount');
         if (cnt) cnt.textContent = `${list.length} مورد`;
@@ -2046,6 +2081,11 @@ class AccountingApp {
             </tr>
         `).join('');
 
+        const totals = list.reduce((a,v)=>{
+            a.totalUSD += v.totalUSD; a.paidUSD += v.paidUSD; a.remainUSD += v.remainUSD;
+            a.totalIQD += v.totalIQD; a.paidIQD += v.paidIQD; a.remainIQD += v.remainIQD; return a;
+        }, { totalUSD:0, paidUSD:0, remainUSD:0, totalIQD:0, paidIQD:0, remainIQD:0 });
+
         const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('ملخص الشراء بالآجل حسب المورد') : '';
         const footer = (typeof buildPrintFooterHTML === 'function') ? buildPrintFooterHTML() : '';
         const html = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>ملخص الشراء بالآجل حسب المورد</title>
@@ -2055,6 +2095,14 @@ class AccountingApp {
             table { width: 100%; border-collapse: collapse; font-size: 13px; }
             th, td { border: 1px solid #333; padding: 6px 8px; }
             thead { display: table-header-group; background: #f8f9fa; }
+            .summary-cards { margin-top: 12px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+            .summary-card { border: 1px solid #e5e7eb; border-radius: 16px; padding: 10px 12px; background: #f8fafc; }
+            .muted { color: #6b7280; font-size: 12px; margin-bottom: 4px; }
+            .val { font-weight: 700; }
+            .green { color: #16a34a; }
+            .blue { color: #2563eb; }
+            .red { color: #dc2626; }
+            .amber { color: #d97706; }
         </style>
         </head><body>
             ${header}
@@ -2074,6 +2122,12 @@ class AccountingApp {
                     </thead>
                     <tbody>${rows}</tbody>
                 </table>
+                <div class="summary-cards">
+                    <div class="summary-card"><div class="muted">إجمالي الدولار</div><div class="val green">${this.formatCurrency(totals.totalUSD,'USD')}</div></div>
+                    <div class="summary-card"><div class="muted">إجمالي الدينار</div><div class="val blue">${this.formatCurrency(totals.totalIQD,'IQD')}</div></div>
+                    <div class="summary-card"><div class="muted">المتبقي بالدولار</div><div class="val red">${this.formatCurrency(totals.remainUSD,'USD')}</div></div>
+                    <div class="summary-card"><div class="muted">المتبقي بالدينار</div><div class="val amber">${this.formatCurrency(totals.remainIQD,'IQD')}</div></div>
+                </div>
             </div>
             ${footer}
         </body></html>`;
