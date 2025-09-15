@@ -487,6 +487,9 @@ class AccountingApp {
                     </div>
                 </div>
 
+                <!-- Embedded: General Capital Report (by shareholder) -->
+                ${this.generateGeneralCapitalReportHTML()}
+
                 <!-- Search Section -->
                 <div class="neumorphic-card mb-4">
                     <div class="card-header">
@@ -1423,6 +1426,366 @@ class AccountingApp {
         this.showCapitalReportPage();
     }
 
+    // ===== تقرير رأس المال العام (تجميع حسب المساهم) =====
+    generateGeneralCapitalReport() {
+        this.showGeneralCapitalReportPage();
+    }
+
+    showGeneralCapitalReportPage() {
+        this.showSection('reports');
+        setTimeout(() => {
+            const reportsSection = document.getElementById('reportsSection');
+            if (reportsSection) {
+                reportsSection.innerHTML = this.generateGeneralCapitalReportHTML();
+                // default load
+                this.loadGeneralCapitalReportData();
+                this.setupGeneralCapitalReportSearch();
+            }
+        }, 100);
+    }
+
+    generateGeneralCapitalReportHTML() {
+        return `
+            <div class="gcap-report-container">
+                <div class="neumorphic-card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0"><i class="bi bi-people me-2"></i>تقرير رأس المال العام (حسب المساهم)</h4>
+                        <div class="report-actions">
+                            <button class="btn btn-success neumorphic-btn btn-sm" onclick="app.printGeneralCapitalReport()">
+                                <i class="bi bi-printer me-1"></i>طباعة
+                            </button>
+                            <button class="btn btn-primary neumorphic-btn btn-sm ms-2" onclick="app.exportGeneralCapitalReport()">
+                                <i class="bi bi-download me-1"></i>تصدير
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="neumorphic-card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-search me-2"></i>الفترة</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-3">
+                                <label class="form-label">من تاريخ</label>
+                                <input type="date" id="gcapFrom" class="form-control neumorphic-input">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">إلى تاريخ</label>
+                                <input type="date" id="gcapTo" class="form-control neumorphic-input" value="${new Date().toISOString().split('T')[0]}">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">اسم المساهم</label>
+                                <input type="text" id="gcapName" class="form-control neumorphic-input" placeholder="فلترة باسم المساهم (اختياري)">
+                            </div>
+                            <div class="col-md-3 d-flex gap-2">
+                                <button class="btn btn-primary neumorphic-btn flex-grow-1" onclick="app.searchGeneralCapitalReport()">
+                                    <i class="bi bi-search me-1"></i>تحديث
+                                </button>
+                                <button class="btn btn-secondary neumorphic-btn" onclick="app.clearGeneralCapitalReportFilters()">
+                                    <i class="bi bi-x-circle me-1"></i>مسح
+                                </button>
+                            </div>
+                        </div>
+                        <div class="text-muted small mt-2">ملاحظة: "رصيد أول الفترة" يُحتسب من جميع قيود رأس المال قبل تاريخ "من" لكل مساهم.</div>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-3 mb-2">
+                        <div class="neumorphic-card text-center p-3">
+                            <div class="text-muted">إجمالي رصيد أول (دولار)</div>
+                            <div id="gcapOpenUSD" class="fw-bold text-secondary">$0.00</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <div class="neumorphic-card text-center p-3">
+                            <div class="text-muted">إجمالي المودع (دولار)</div>
+                            <div id="gcapDepUSD" class="fw-bold text-success">$0.00</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <div class="neumorphic-card text-center p-3">
+                            <div class="text-muted">إجمالي المسحوب (دولار)</div>
+                            <div id="gcapWithUSD" class="fw-bold text-danger">$0.00</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <div class="neumorphic-card text-center p-3">
+                            <div class="text-muted">إجمالي الرصيد (دولار)</div>
+                            <div id="gcapBalUSD" class="fw-bold text-primary">$0.00</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <div class="neumorphic-card text-center p-3">
+                            <div class="text-muted">إجمالي رصيد أول (دينار)</div>
+                            <div id="gcapOpenIQD" class="fw-bold text-secondary">0 د.ع</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <div class="neumorphic-card text-center p-3">
+                            <div class="text-muted">إجمالي المودع (دينار)</div>
+                            <div id="gcapDepIQD" class="fw-bold text-success">0 د.ع</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <div class="neumorphic-card text-center p-3">
+                            <div class="text-muted">إجمالي المسحوب (دينار)</div>
+                            <div id="gcapWithIQD" class="fw-bold text-danger">0 د.ع</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <div class="neumorphic-card text-center p-3">
+                            <div class="text-muted">إجمالي الرصيد (دينار)</div>
+                            <div id="gcapBalIQD" class="fw-bold text-primary">0 د.ع</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="neumorphic-card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-table me-2"></i>الجدول (تجميع حسب اسم المساهم)</h5>
+                        <div class="text-muted small" id="gcapCount"></div>
+                    </div>
+                    <div class="card-body">
+                        <div id="gcapTableWrap" class="table-responsive"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    setupGeneralCapitalReportSearch() {
+        ['gcapFrom','gcapTo','gcapName'].forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const evt = (el.tagName === 'SELECT') ? 'change' : 'input';
+            el.addEventListener(evt, () => this.searchGeneralCapitalReport());
+        });
+    }
+
+    clearGeneralCapitalReportFilters() {
+        const today = new Date().toISOString().split('T')[0];
+        const fromEl = document.getElementById('gcapFrom'); if (fromEl) fromEl.value = '';
+        const toEl = document.getElementById('gcapTo'); if (toEl) toEl.value = today;
+        const nEl = document.getElementById('gcapName'); if (nEl) nEl.value = '';
+        this.loadGeneralCapitalReportData();
+    }
+
+    searchGeneralCapitalReport() {
+        this.loadGeneralCapitalReportData(this.getGeneralCapitalCriteria());
+    }
+
+    getGeneralCapitalCriteria() {
+        return {
+            from: document.getElementById('gcapFrom')?.value || '',
+            to: document.getElementById('gcapTo')?.value || '',
+            name: (document.getElementById('gcapName')?.value || '').trim().toLowerCase()
+        };
+    }
+
+    // Core aggregation: per shareholder, compute opening (before from), period deposits/withdrawals, balances for USD/IQD
+    loadGeneralCapitalReportData(criteria = null) {
+        const all = StorageManager.getAllData();
+        const capital = Array.isArray(all.capital) ? all.capital.slice() : [];
+        const shareholders = Array.isArray(all.shareholders) ? all.shareholders.slice() : [];
+
+        // Build map of shareholder id -> name
+        const shMap = new Map(shareholders.map(s => [s.id, s.name]));
+
+        // Helper to get signed amount based on type
+        const signed = (entry) => {
+            const raw = parseFloat(entry.amount) || 0;
+            const isWith = (entry.type || '').toLowerCase() === 'withdrawal';
+            return isWith ? -Math.abs(raw) : Math.abs(raw);
+        };
+
+        // Parse criteria dates
+        const fromDate = criteria?.from ? new Date(criteria.from) : null;
+        const toDate = criteria?.to ? new Date(criteria.to) : null;
+
+        // Aggregate by shareholder
+        const agg = new Map();
+        for (const e of capital) {
+            const name = shMap.get(e.shareholderId) || 'غير محدد';
+            if (criteria?.name && !name.toLowerCase().includes(criteria.name)) continue;
+            const key = e.shareholderId || name;
+            if (!agg.has(key)) agg.set(key, {
+                shareholderId: e.shareholderId || null,
+                name,
+                openUSD: 0, openIQD: 0,
+                depUSD: 0, depIQD: 0,
+                withUSD: 0, withIQD: 0,
+                balUSD: 0, balIQD: 0
+            });
+            const g = agg.get(key);
+
+            const d = new Date(e.date);
+            const amt = signed(e);
+            const isWith = amt < 0;
+            const inPeriod = (!fromDate || d >= fromDate) && (!toDate || d <= toDate);
+
+            if (inPeriod) {
+                if (e.currency === 'USD') {
+                    if (isWith) g.withUSD += Math.abs(amt); else g.depUSD += Math.abs(amt);
+                } else if (e.currency === 'IQD') {
+                    if (isWith) g.withIQD += Math.abs(amt); else g.depIQD += Math.abs(amt);
+                }
+            } else if (fromDate && d < fromDate) {
+                if (e.currency === 'USD') g.openUSD += amt; else if (e.currency === 'IQD') g.openIQD += amt;
+            }
+        }
+
+        // Compute balances: opening + deposits - withdrawals per currency
+        const rows = Array.from(agg.values()).map(r => ({
+            ...r,
+            // opening stored as signed net, display absolute in table column
+            openUSDDisp: r.openUSD,
+            openIQDDisp: r.openIQD,
+            balUSD: (r.openUSD) + (r.depUSD) - (r.withUSD),
+            balIQD: (r.openIQD) + (r.depIQD) - (r.withIQD)
+        })).sort((a,b) => a.name.localeCompare(b.name, 'ar'));
+
+        this.renderGeneralCapitalReportTable(rows);
+        this.updateGeneralCapitalReportSummary(rows);
+    }
+
+    renderGeneralCapitalReportTable(rows) {
+        const wrap = document.getElementById('gcapTableWrap');
+        if (!wrap) return;
+        if (!rows || rows.length === 0) {
+            wrap.innerHTML = '<div class="text-center text-muted py-4"><i class="bi bi-inbox display-6"></i><div class="mt-2">لا توجد بيانات مطابقة</div></div>';
+            const cnt = document.getElementById('gcapCount'); if (cnt) cnt.textContent = '';
+            return;
+        }
+
+        const body = rows.map((r,i)=>`
+            <tr>
+                <td>${i+1}</td>
+                <td>${r.name}</td>
+                <td class="text-secondary">${this.formatCurrency(r.openIQDDisp,'IQD')}</td>
+                <td class="text-success">${this.formatCurrency(r.depIQD,'IQD')}</td>
+                <td class="text-danger">${this.formatCurrency(r.withIQD,'IQD')}</td>
+                <td class="text-primary fw-bold">${this.formatCurrency(r.balIQD,'IQD')}</td>
+                <td class="text-secondary">${this.formatCurrency(r.openUSDDisp,'USD')}</td>
+                <td class="text-success">${this.formatCurrency(r.depUSD,'USD')}</td>
+                <td class="text-danger">${this.formatCurrency(r.withUSD,'USD')}</td>
+                <td class="text-primary fw-bold">${this.formatCurrency(r.balUSD,'USD')}</td>
+            </tr>
+        `).join('');
+
+        // Totals
+        const totals = rows.reduce((a,r)=>{
+            a.openUSD += r.openUSDDisp; a.depUSD += r.depUSD; a.withUSD += r.withUSD; a.balUSD += r.balUSD;
+            a.openIQD += r.openIQDDisp; a.depIQD += r.depIQD; a.withIQD += r.withIQD; a.balIQD += r.balIQD; return a;
+        }, {openUSD:0,depUSD:0,withUSD:0,balUSD:0,openIQD:0,depIQD:0,withIQD:0,balIQD:0});
+
+        wrap.innerHTML = `
+            <table class="table table-sm table-striped align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>#</th>
+                        <th>اسم المساهم</th>
+                        <th>رصيد أول الفترة د.ع</th>
+                        <th>المبلغ المودع د.ع</th>
+                        <th>المبلغ المسحوب د.ع</th>
+                        <th>رصيده د.ع</th>
+                        <th>رصيد أول الفترة دولار</th>
+                        <th>المبلغ المودع دولار</th>
+                        <th>المبلغ المسحوب دولار</th>
+                        <th>رصيده دولار</th>
+                    </tr>
+                </thead>
+                <tbody>${body}</tbody>
+                <tfoot class="table-light">
+                    <tr class="fw-bold">
+                        <td colspan="2" class="text-center">الإجمالي</td>
+                        <td>${this.formatCurrency(totals.openIQD,'IQD')}</td>
+                        <td>${this.formatCurrency(totals.depIQD,'IQD')}</td>
+                        <td>${this.formatCurrency(totals.withIQD,'IQD')}</td>
+                        <td>${this.formatCurrency(totals.balIQD,'IQD')}</td>
+                        <td>${this.formatCurrency(totals.openUSD,'USD')}</td>
+                        <td>${this.formatCurrency(totals.depUSD,'USD')}</td>
+                        <td>${this.formatCurrency(totals.withUSD,'USD')}</td>
+                        <td>${this.formatCurrency(totals.balUSD,'USD')}</td>
+                    </tr>
+                </tfoot>
+            </table>`;
+        const cnt = document.getElementById('gcapCount'); if (cnt) cnt.textContent = `${rows.length} مساهم`;
+    }
+
+    updateGeneralCapitalReportSummary(rows) {
+        const sum = rows.reduce((a,r)=>{
+            a.openUSD += r.openUSDDisp; a.depUSD += r.depUSD; a.withUSD += r.withUSD; a.balUSD += r.balUSD;
+            a.openIQD += r.openIQDDisp; a.depIQD += r.depIQD; a.withIQD += r.withIQD; a.balIQD += r.balIQD; return a;
+        }, {openUSD:0,depUSD:0,withUSD:0,balUSD:0,openIQD:0,depIQD:0,withIQD:0,balIQD:0});
+        const set = (id, val, cur) => { const el = document.getElementById(id); if (el) el.textContent = this.formatCurrency(val, cur); };
+        set('gcapOpenUSD', sum.openUSD, 'USD');
+        set('gcapDepUSD', sum.depUSD, 'USD');
+        set('gcapWithUSD', sum.withUSD, 'USD');
+        set('gcapBalUSD', sum.balUSD, 'USD');
+        set('gcapOpenIQD', sum.openIQD, 'IQD');
+        set('gcapDepIQD', sum.depIQD, 'IQD');
+        set('gcapWithIQD', sum.withIQD, 'IQD');
+        set('gcapBalIQD', sum.balIQD, 'IQD');
+    }
+
+    printGeneralCapitalReport() {
+        const wrap = document.getElementById('gcapTableWrap');
+        if (!wrap) return;
+        const headerHTML = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('تقرير رأس المال العام') : '';
+        const win = window.open('', '_blank', 'width=1200,height=800');
+        const html = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>تقرير رأس المال العام</title><style>body{font-family:Arial,sans-serif;margin:20px;direction:rtl;color:#333} table{width:100%;border-collapse:collapse} th,td{border:1px solid #333;padding:8px;text-align:center} thead{background:#222;color:#fff} .sum{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0} .card{border:1px solid #ddd;border-radius:8px;padding:10px}</style></head><body>${headerHTML}<div class="sum">`+
+            `<div class='card'><div>رصيد أول $</div><div class='fw-bold'>${document.getElementById('gcapOpenUSD')?.textContent || '$0.00'}</div></div>`+
+            `<div class='card'><div>المودع $</div><div class='fw-bold'>${document.getElementById('gcapDepUSD')?.textContent || '$0.00'}</div></div>`+
+            `<div class='card'><div>المسحوب $</div><div class='fw-bold'>${document.getElementById('gcapWithUSD')?.textContent || '$0.00'}</div></div>`+
+            `<div class='card'><div>الرصيد $</div><div class='fw-bold'>${document.getElementById('gcapBalUSD')?.textContent || '$0.00'}</div></div>`+
+            `</div><div class="sum">`+
+            `<div class='card'><div>رصيد أول د.ع</div><div class='fw-bold'>${document.getElementById('gcapOpenIQD')?.textContent || '0 د.ع'}</div></div>`+
+            `<div class='card'><div>المودع د.ع</div><div class='fw-bold'>${document.getElementById('gcapDepIQD')?.textContent || '0 د.ع'}</div></div>`+
+            `<div class='card'><div>المسحوب د.ع</div><div class='fw-bold'>${document.getElementById('gcapWithIQD')?.textContent || '0 د.ع'}</div></div>`+
+            `<div class='card'><div>الرصيد د.ع</div><div class='fw-bold'>${document.getElementById('gcapBalIQD')?.textContent || '0 د.ع'}</div></div>`+
+            `</div><div style="margin-top:20px">${wrap.innerHTML}</div>${buildPrintFooterHTML ? buildPrintFooterHTML() : ''}</body></html>`;
+        win.document.write(html); win.document.close(); win.onload = () => setTimeout(()=>{ try{win.print();}catch(e){} }, 300);
+    }
+
+    exportGeneralCapitalReport() {
+        // Build current rows again using criteria
+        const criteria = this.getGeneralCapitalCriteria();
+        const all = StorageManager.getAllData();
+        const capital = Array.isArray(all.capital) ? all.capital.slice() : [];
+        const shareholders = Array.isArray(all.shareholders) ? all.shareholders.slice() : [];
+        const shMap = new Map(shareholders.map(s => [s.id, s.name]));
+        const signed = (e)=>{ const raw=parseFloat(e.amount)||0; const w=(e.type||'').toLowerCase()==='withdrawal'; return w? -Math.abs(raw): Math.abs(raw); };
+        const fromDate = criteria?.from ? new Date(criteria.from) : null;
+        const toDate = criteria?.to ? new Date(criteria.to) : null;
+        const agg = new Map();
+        for (const e of capital){
+            const name = shMap.get(e.shareholderId) || 'غير محدد';
+            if (criteria?.name && !name.toLowerCase().includes(criteria.name)) continue;
+            const key = e.shareholderId || name;
+            if (!agg.has(key)) agg.set(key,{name,openUSD:0,openIQD:0,depUSD:0,depIQD:0,withUSD:0,withIQD:0});
+            const d=new Date(e.date); const amt=signed(e); const isWith=amt<0; const inPeriod=(!fromDate||d>=fromDate)&&(!toDate||d<=toDate);
+            if (inPeriod){ if (e.currency==='USD'){ if(isWith) agg.get(key).withUSD+=Math.abs(amt); else agg.get(key).depUSD+=Math.abs(amt);} else if (e.currency==='IQD'){ if(isWith) agg.get(key).withIQD+=Math.abs(amt); else agg.get(key).depIQD+=Math.abs(amt);} }
+            else if (fromDate && d<fromDate){ if (e.currency==='USD') agg.get(key).openUSD+=amt; else if (e.currency==='IQD') agg.get(key).openIQD+=amt; }
+        }
+        const rows = Array.from(agg.values()).map(r=>({
+            name:r.name,
+            openUSD:r.openUSD, depUSD:r.depUSD, withUSD:r.withUSD, balUSD: r.openUSD + r.depUSD - r.withUSD,
+            openIQD:r.openIQD, depIQD:r.depIQD, withIQD:r.withIQD, balIQD: r.openIQD + r.depIQD - r.withIQD
+        })).sort((a,b)=> a.name.localeCompare(b.name,'ar'));
+
+        const data = {
+            title: 'تقرير رأس المال العام',
+            generatedAt: new Date().toISOString(),
+            period: { from: criteria.from || null, to: criteria.to || null },
+            rows
+        };
+        const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `general_capital_report_${new Date().toISOString().split('T')[0]}.json`; a.click();
+    }
+
     showCapitalReportPage() {
         // Switch to reports section first
         this.showSection('reports');
@@ -1432,6 +1795,8 @@ class AccountingApp {
             const reportsSection = document.getElementById('reportsSection');
             if (reportsSection) {
                 reportsSection.innerHTML = this.generateCapitalReportHTML();
+                // Initialize both embedded General Capital section and the detailed entries table
+                try { this.loadGeneralCapitalReportData(); this.setupGeneralCapitalReportSearch(); } catch(e) { console.warn('General Capital init failed', e); }
                 this.loadCapitalReportData();
                 this.setupCapitalReportSearch();
             }
