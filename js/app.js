@@ -1596,6 +1596,25 @@ class AccountingApp {
                     </div>
                 </div>
 
+                <!-- Vendor Aggregated Summary (before filters) -->
+                <div class="neumorphic-card mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-people me-2"></i>ملخص حسب المورد</h5>
+                        <div class="d-flex align-items-center gap-2">
+                            <small id="cprVendorAggCount" class="text-muted"></small>
+                            <button class="btn btn-success btn-sm neumorphic-btn" onclick="app.printCreditPurchaseVendorSummary()">
+                                <i class="bi bi-printer me-1"></i>طباعة
+                            </button>
+                            <button class="btn btn-primary btn-sm neumorphic-btn" onclick="app.exportCreditPurchaseVendorSummary()">
+                                <i class="bi bi-download me-1"></i>تصدير CSV
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="cprVendorAggWrap" class="table-responsive"></div>
+                    </div>
+                </div>
+
                 <!-- Filters -->
                 <div class="neumorphic-card mb-3">
                     <div class="card-header">
@@ -1783,6 +1802,8 @@ class AccountingApp {
         });
 
         this.updateCreditPurchaseReportSummary(rows);
+        // Render vendor aggregated summary based on current filtered rows
+        this.renderCreditPurchaseReportVendorAggTable(rows);
         this.renderCreditPurchaseReportTable(rows);
     }
 
@@ -1904,6 +1925,164 @@ class AccountingApp {
                 <tbody>${bodyRows}</tbody>
             </table>
         `;
+    }
+
+    // ===== Vendor aggregated summary rendering =====
+    renderCreditPurchaseReportVendorAggTable(detailRows) {
+        const wrap = document.getElementById('cprVendorAggWrap');
+        if (!wrap) return;
+        const rows = Array.isArray(detailRows) ? detailRows : [];
+        if (rows.length === 0) {
+            wrap.innerHTML = '<div class="text-center text-muted py-3">لا توجد بيانات لعرض الملخص</div>';
+            const cnt = document.getElementById('cprVendorAggCount');
+            if (cnt) cnt.textContent = '';
+            return;
+        }
+
+        // Group by vendor
+        const map = new Map();
+        for (const r of rows) {
+            const key = r.vendor || '-';
+            if (!map.has(key)) map.set(key, { vendor: key, totalUSD: 0, paidUSD: 0, remainUSD: 0, totalIQD: 0, paidIQD: 0, remainIQD: 0 });
+            const g = map.get(key);
+            g.totalUSD += r.totalUSD; g.paidUSD += r.paidUSD; g.remainUSD += r.remainUSD;
+            g.totalIQD += r.totalIQD; g.paidIQD += r.paidIQD; g.remainIQD += r.remainIQD;
+        }
+        const list = Array.from(map.values()).sort((a,b) => a.vendor.localeCompare(b.vendor, 'ar'));
+
+        const body = list.map((v,i)=>`
+            <tr>
+                <td>${i+1}</td>
+                <td>${v.vendor}</td>
+                <td class="text-primary fw-bold">${this.formatCurrency(v.totalIQD,'IQD')}</td>
+                <td class="text-primary">${this.formatCurrency(v.paidIQD,'IQD')}</td>
+                <td class="text-warning">${this.formatCurrency(v.remainIQD,'IQD')}</td>
+                <td class="text-success fw-bold">${this.formatCurrency(v.totalUSD,'USD')}</td>
+                <td class="text-success">${this.formatCurrency(v.paidUSD,'USD')}</td>
+                <td class="text-danger">${this.formatCurrency(v.remainUSD,'USD')}</td>
+            </tr>
+        `).join('');
+
+        wrap.innerHTML = `
+            <table class="table table-sm table-striped align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>#</th>
+                        <th>اسم المورد</th>
+                        <th>مبلغه دينار</th>
+                        <th>المسدد دينار</th>
+                        <th>المتبقي دينار</th>
+                        <th>مبلغه دولار</th>
+                        <th>المسدد دولار</th>
+                        <th>المتبقي دولار</th>
+                    </tr>
+                </thead>
+                <tbody>${body}</tbody>
+            </table>`;
+
+        const cnt = document.getElementById('cprVendorAggCount');
+        if (cnt) cnt.textContent = `${list.length} مورد`;
+    }
+
+    // Helper to compute vendor summary data using current filters
+    getCreditPurchaseVendorSummaryData() {
+        const all = StorageManager.getAllData().creditPurchases || [];
+        const criteria = this.getCreditPurchaseReportCriteria();
+        const list = this.filterCreditPurchasesForReport(all, criteria);
+
+        // Build detail-like rows to reuse logic
+        const today = new Date();
+        const details = list.map(cp => {
+            const paid = this.computeCPPaidSums(cp);
+            const remain = this.computeCPRemaining(cp, paid);
+            return {
+                vendor: cp.vendor || '-',
+                totalUSD: parseFloat(cp.amountUSD) || 0,
+                paidUSD: paid.usd,
+                remainUSD: remain.usd,
+                totalIQD: parseFloat(cp.amountIQD) || 0,
+                paidIQD: paid.iqd,
+                remainIQD: remain.iqd
+            };
+        });
+
+        // Aggregate by vendor
+        const map = new Map();
+        for (const r of details) {
+            const key = r.vendor;
+            if (!map.has(key)) map.set(key, { vendor: key, totalUSD: 0, paidUSD: 0, remainUSD: 0, totalIQD: 0, paidIQD: 0, remainIQD: 0 });
+            const g = map.get(key);
+            g.totalUSD += r.totalUSD; g.paidUSD += r.paidUSD; g.remainUSD += r.remainUSD;
+            g.totalIQD += r.totalIQD; g.paidIQD += r.paidIQD; g.remainIQD += r.remainIQD;
+        }
+        return Array.from(map.values()).sort((a,b)=> a.vendor.localeCompare(b.vendor,'ar'));
+    }
+
+    exportCreditPurchaseVendorSummary() {
+        const list = this.getCreditPurchaseVendorSummaryData();
+        const headers = ['#','Vendor','TotalIQD','PaidIQD','RemainIQD','TotalUSD','PaidUSD','RemainUSD'];
+        const csv = [headers.join(',')].concat(
+            list.map((v,i)=> [i+1, `"${(v.vendor||'').replace(/"/g,'""')}"`, v.totalIQD, v.paidIQD, v.remainIQD, v.totalUSD, v.paidUSD, v.remainUSD].join(','))
+        ).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `credit_purchase_vendor_summary_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click(); URL.revokeObjectURL(url);
+    }
+
+    printCreditPurchaseVendorSummary() {
+        const list = this.getCreditPurchaseVendorSummaryData();
+        const rows = list.map((v,i)=> `
+            <tr>
+                <td>${i+1}</td>
+                <td>${v.vendor}</td>
+                <td style="text-align:left">${this.formatCurrency(v.totalIQD,'IQD')}</td>
+                <td style="text-align:left">${this.formatCurrency(v.paidIQD,'IQD')}</td>
+                <td style="text-align:left">${this.formatCurrency(v.remainIQD,'IQD')}</td>
+                <td style="text-align:left">${this.formatCurrency(v.totalUSD,'USD')}</td>
+                <td style="text-align:left">${this.formatCurrency(v.paidUSD,'USD')}</td>
+                <td style="text-align:left">${this.formatCurrency(v.remainUSD,'USD')}</td>
+            </tr>
+        `).join('');
+
+        const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('ملخص الشراء بالآجل حسب المورد') : '';
+        const footer = (typeof buildPrintFooterHTML === 'function') ? buildPrintFooterHTML() : '';
+        const html = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>ملخص الشراء بالآجل حسب المورد</title>
+        <style>
+            @page { size: A4 portrait; margin: 12mm; }
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; font-family: 'Cairo','Tahoma','Arial',sans-serif; }
+            table { width: 100%; border-collapse: collapse; font-size: 13px; }
+            th, td { border: 1px solid #333; padding: 6px 8px; }
+            thead { display: table-header-group; background: #f8f9fa; }
+        </style>
+        </head><body>
+            ${header}
+            <div class="print-body">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>اسم المورد</th>
+                            <th>مبلغه دينار</th>
+                            <th>المسدد دينار</th>
+                            <th>المتبقي دينار</th>
+                            <th>مبلغه دولار</th>
+                            <th>المسدد دولار</th>
+                            <th>المتبقي دولار</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+            ${footer}
+        </body></html>`;
+
+        const w = window.open('', '_blank', 'width=1000,height=800');
+        w.document.open();
+        w.document.write(html);
+        w.document.close();
+        w.onload = () => setTimeout(() => { try { w.print(); } catch(_){} }, 250);
     }
 
     exportCreditPurchaseReport() {
