@@ -1584,15 +1584,7 @@ class AccountingApp {
                 <!-- Header -->
                 <div class="neumorphic-card mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h4><i class="bi bi-cart-check me-2"></i>تقرير الشراء بالآجل</h4>
-                        <div class="report-actions">
-                            <button class="btn btn-success neumorphic-btn btn-sm" onclick="app.printCreditPurchaseReport()">
-                                <i class="bi bi-printer me-1"></i>طباعة
-                            </button>
-                            <button class="btn btn-primary neumorphic-btn btn-sm ms-2" onclick="app.exportCreditPurchaseReport()">
-                                <i class="bi bi-download me-1"></i>تصدير CSV
-                            </button>
-                        </div>
+                        <h4 class="mb-0"><i class="bi bi-cart-check me-2"></i>تقرير الشراء بالآجل</h4>
                     </div>
                 </div>
 
@@ -1617,8 +1609,16 @@ class AccountingApp {
 
                 <!-- Filters -->
                 <div class="neumorphic-card mb-3">
-                    <div class="card-header">
-                        <h5><i class="bi bi-search me-2"></i>البحث والتصفية</h5>
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-search me-2"></i>البحث والتصفية</h5>
+                        <div class="report-actions">
+                            <button class="btn btn-success neumorphic-btn btn-sm" onclick="app.printCreditPurchaseReport()">
+                                <i class="bi bi-printer me-1"></i>طباعة
+                            </button>
+                            <button class="btn btn-primary neumorphic-btn btn-sm ms-2" onclick="app.exportCreditPurchaseReport()">
+                                <i class="bi bi-download me-1"></i>تصدير CSV
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body">
                         <div class="row g-2 align-items-end">
