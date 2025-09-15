@@ -258,7 +258,7 @@ class DashboardManager {
                                         ${transaction.type}
                                     </span>
                                 </td>
-                                <td class="fw-bold">${this.formatCurrency(transaction.amount, transaction.currency)}</td>
+                                <td class="fw-bold">${this.formatCurrency((transaction.amountUSD!==undefined?transaction.amountUSD: (transaction.amountIQD!==undefined?transaction.amountIQD: transaction.amount)), (transaction.amountUSD!==undefined?'USD': (transaction.amountIQD!==undefined?'IQD': transaction.currency)))}</td>
                                 <td>
                                     <span class="badge bg-secondary">${transaction.currency}</span>
                                 </td>

@@ -365,9 +365,9 @@ class AccountingApp {
                     <div class="card">
                         <div class="card-body">
                             <h6>الملخص المالي</h6>
-                            <p>رأس المال: ${this.formatCurrency(totals.totalUSD, 'USD')} | ${this.formatCurrency(totals.totalIQD, 'IQD')}</p>
+                            <p>رأس المال: ${this.formatCurrency(totals.capitalUSD, 'USD')} | ${this.formatCurrency(totals.capitalIQD, 'IQD')}</p>
                             <p>المصروفات: ${this.formatCurrency(totals.expensesUSD, 'USD')} | ${this.formatCurrency(totals.expensesIQD, 'IQD')}</p>
-                            <p>المتبقي: ${this.formatCurrency(totals.totalUSD - totals.expensesUSD, 'USD')} | ${this.formatCurrency(totals.totalIQD - totals.expensesIQD, 'IQD')}</p>
+                            <p>المتبقي: ${this.formatCurrency(totals.totalUSD, 'USD')} | ${this.formatCurrency(totals.totalIQD, 'IQD')}</p>
                         </div>
                     </div>
                 </div>
@@ -2780,46 +2780,50 @@ class AccountingApp {
     }
 
     calculateTotals(data) {
-        let totalUSD = 0;
-        let totalIQD = 0;
-        let revenueUSD = 0;
-        let revenueIQD = 0;
+        // Capital (revenues) totals
+        let capitalUSD = 0;
+        let capitalIQD = 0;
+        // Expenses totals
         let expensesUSD = 0;
         let expensesIQD = 0;
+        // Credit purchases remaining
         let creditRemainUSD = 0;
         let creditRemainIQD = 0;
 
-        // Calculate capital totals
+        // Capital sums
         if (data.capital) {
             data.capital.forEach(entry => {
-                if (entry.currency === 'USD') {
-                    totalUSD += parseFloat(entry.amount) || 0;
-                } else if (entry.currency === 'IQD') {
-                    totalIQD += parseFloat(entry.amount) || 0;
-                }
+                const amt = parseFloat(entry.amount) || 0;
+                if (entry.currency === 'USD') capitalUSD += amt;
+                else if (entry.currency === 'IQD') capitalIQD += amt;
             });
         }
 
-        // Calculate expenses totals
+        // Expenses sums (support mixed currency fields)
         if (data.expenses) {
             data.expenses.forEach(entry => {
-                if (entry.currency === 'USD') {
-                    expensesUSD += parseFloat(entry.amount) || 0;
-                } else if (entry.currency === 'IQD') {
-                    expensesIQD += parseFloat(entry.amount) || 0;
+                let used = false;
+                if (entry.amountUSD !== undefined) {
+                    expensesUSD += parseFloat(entry.amountUSD) || 0;
+                    used = true;
+                }
+                if (entry.amountIQD !== undefined) {
+                    expensesIQD += parseFloat(entry.amountIQD) || 0;
+                    used = true;
+                }
+                if (!used) {
+                    const amt = parseFloat(entry.amount) || 0;
+                    if (entry.currency === 'USD') expensesUSD += amt;
+                    else if (entry.currency === 'IQD') expensesIQD += amt;
                 }
             });
         }
 
-        // Calculate revenues (for now, same as capital - can be extended)
-        revenueUSD = totalUSD;
-        revenueIQD = totalIQD;
+        // Remaining
+        const remainingUSD = capitalUSD - expensesUSD;
+        const remainingIQD = capitalIQD - expensesIQD;
 
-        // Calculate remaining amounts
-        const remainingUSD = totalUSD - expensesUSD;
-        const remainingIQD = totalIQD - expensesIQD;
-
-        // Calculate credit purchases remaining (link to report logic)
+        // Credit purchases remaining
         try {
             const cps = data.creditPurchases || [];
             for (const cp of cps) {
@@ -2834,12 +2838,19 @@ class AccountingApp {
         } catch (e) { console.warn('credit purchases calc failed', e); }
 
         return {
+            // Cash on hand
             totalUSD: remainingUSD,
             totalIQD: remainingIQD,
-            revenueUSD,
-            revenueIQD,
+            // For summary rows
+            capitalUSD,
+            capitalIQD,
+            // For dashboard revenue cards
+            revenueUSD: capitalUSD,
+            revenueIQD: capitalIQD,
+            // Expenses totals
             expensesUSD,
             expensesIQD,
+            // Credit remaining
             creditRemainUSD,
             creditRemainIQD
         };
@@ -2917,8 +2928,8 @@ class AccountingApp {
                     ${recentTransactions.map(transaction => `
                         <tr>
                             <td><span class="badge bg-${transaction.type === 'رأس مال' ? 'success' : 'danger'}">${transaction.type}</span></td>
-                            <td>${this.formatCurrency(transaction.amount, transaction.currency)}</td>
-                            <td>${transaction.currency}</td>
+                            <td>${this.formatCurrency((transaction.amountUSD!==undefined?transaction.amountUSD: (transaction.amountIQD!==undefined?transaction.amountIQD: transaction.amount)), (transaction.amountUSD!==undefined?'USD': (transaction.amountIQD!==undefined?'IQD': transaction.currency)))}</td>
+                            <td>${(transaction.amountUSD!==undefined?'USD': (transaction.amountIQD!==undefined?'IQD': transaction.currency))}</td>
                             <td>${this.formatDate(transaction.date)}</td>
                             <td>${transaction.description || transaction.notes || '-'}</td>
                         </tr>

@@ -91,11 +91,19 @@ class ReportsManager {
         // Calculate expenses totals
         if (data.expenses) {
             data.expenses.forEach(entry => {
-                const amount = parseFloat(entry.amount) || 0;
-                if (entry.currency === 'USD') {
-                    financial.expenses.USD += amount;
-                } else if (entry.currency === 'IQD') {
-                    financial.expenses.IQD += amount;
+                let addedUSD = false, addedIQD = false;
+                if (entry.amountUSD !== undefined) {
+                    financial.expenses.USD += parseFloat(entry.amountUSD) || 0;
+                    addedUSD = true;
+                }
+                if (entry.amountIQD !== undefined) {
+                    financial.expenses.IQD += parseFloat(entry.amountIQD) || 0;
+                    addedIQD = true;
+                }
+                if (!addedUSD && !addedIQD) {
+                    const amount = parseFloat(entry.amount) || 0;
+                    if (entry.currency === 'USD') financial.expenses.USD += amount;
+                    else if (entry.currency === 'IQD') financial.expenses.IQD += amount;
                 }
                 financial.expenses.entries++;
             });
@@ -178,49 +186,40 @@ class ReportsManager {
 
         if (data.expenses) {
             data.expenses.forEach(entry => {
-                const amount = parseFloat(entry.amount) || 0;
                 const category = entry.category || 'غير محدد';
                 const paymentMethod = entry.paymentMethod || 'غير محدد';
-                
-                // Total calculations
-                if (entry.currency === 'USD') {
-                    expensesData.totalUSD += amount;
-                    expensesData.largestExpense.USD = Math.max(expensesData.largestExpense.USD, amount);
-                } else if (entry.currency === 'IQD') {
-                    expensesData.totalIQD += amount;
-                    expensesData.largestExpense.IQD = Math.max(expensesData.largestExpense.IQD, amount);
-                }
 
-                // Category breakdown
-                if (!expensesData.categoryBreakdown.has(category)) {
-                    expensesData.categoryBreakdown.set(category, { USD: 0, IQD: 0, count: 0 });
-                }
-                const categoryData = expensesData.categoryBreakdown.get(category);
-                if (entry.currency === 'USD') {
-                    categoryData.USD += amount;
-                } else if (entry.currency === 'IQD') {
-                    categoryData.IQD += amount;
-                }
-                categoryData.count++;
+                const addTo = (cur, amt) => {
+                    if (!expensesData.categoryBreakdown.has(category)) {
+                        expensesData.categoryBreakdown.set(category, { USD: 0, IQD: 0, count: 0 });
+                    }
+                    const cat = expensesData.categoryBreakdown.get(category);
+                    if (cur === 'USD') { expensesData.totalUSD += amt; cat.USD += amt; expensesData.largestExpense.USD = Math.max(expensesData.largestExpense.USD, amt); }
+                    else { expensesData.totalIQD += amt; cat.IQD += amt; expensesData.largestExpense.IQD = Math.max(expensesData.largestExpense.IQD, amt); }
+                    cat.count++;
 
-                // Payment methods
-                if (!expensesData.paymentMethods.has(paymentMethod)) {
-                    expensesData.paymentMethods.set(paymentMethod, { USD: 0, IQD: 0, count: 0 });
+                    if (!expensesData.paymentMethods.has(paymentMethod)) {
+                        expensesData.paymentMethods.set(paymentMethod, { USD: 0, IQD: 0, count: 0 });
+                    }
+                    const pay = expensesData.paymentMethods.get(paymentMethod);
+                    if (cur === 'USD') pay.USD += amt; else pay.IQD += amt; pay.count++;
+                };
+
+                let used = false;
+                if (entry.amountUSD !== undefined) { addTo('USD', parseFloat(entry.amountUSD) || 0); used = true; }
+                if (entry.amountIQD !== undefined) { addTo('IQD', parseFloat(entry.amountIQD) || 0); used = true; }
+                if (!used) {
+                    const amount = parseFloat(entry.amount) || 0;
+                    if (entry.currency === 'USD') addTo('USD', amount);
+                    else if (entry.currency === 'IQD') addTo('IQD', amount);
                 }
-                const paymentData = expensesData.paymentMethods.get(paymentMethod);
-                if (entry.currency === 'USD') {
-                    paymentData.USD += amount;
-                } else if (entry.currency === 'IQD') {
-                    paymentData.IQD += amount;
-                }
-                paymentData.count++;
             });
 
-            // Calculate averages
-            if (data.expenses.length > 0) {
-                expensesData.averageExpense.USD = expensesData.totalUSD / data.expenses.filter(e => e.currency === 'USD').length || 0;
-                expensesData.averageExpense.IQD = expensesData.totalIQD / data.expenses.filter(e => e.currency === 'IQD').length || 0;
-            }
+            // Calculate averages using counts per currency safely
+            const countUSD = data.expenses.filter(e => (e.amountUSD !== undefined) ? (parseFloat(e.amountUSD)||0) > 0 : e.currency === 'USD').length || 0;
+            const countIQD = data.expenses.filter(e => (e.amountIQD !== undefined) ? (parseFloat(e.amountIQD)||0) > 0 : e.currency === 'IQD').length || 0;
+            expensesData.averageExpense.USD = countUSD ? (expensesData.totalUSD / countUSD) : 0;
+            expensesData.averageExpense.IQD = countIQD ? (expensesData.totalIQD / countIQD) : 0;
         }
 
         return expensesData;
@@ -289,19 +288,19 @@ class ReportsManager {
         if (data.expenses) {
             data.expenses.forEach(entry => {
                 const category = entry.category || 'غير محدد';
-                const amount = parseFloat(entry.amount) || 0;
-
                 if (!categories.has(category)) {
                     categories.set(category, { USD: 0, IQD: 0, count: 0 });
                 }
-
-                const categoryData = categories.get(category);
-                if (entry.currency === 'USD') {
-                    categoryData.USD += amount;
-                } else if (entry.currency === 'IQD') {
-                    categoryData.IQD += amount;
+                const cat = categories.get(category);
+                let used = false;
+                if (entry.amountUSD !== undefined) { cat.USD += parseFloat(entry.amountUSD) || 0; used = true; }
+                if (entry.amountIQD !== undefined) { cat.IQD += parseFloat(entry.amountIQD) || 0; used = true; }
+                if (!used) {
+                    const amount = parseFloat(entry.amount) || 0;
+                    if (entry.currency === 'USD') cat.USD += amount;
+                    else if (entry.currency === 'IQD') cat.IQD += amount;
                 }
-                categoryData.count++;
+                cat.count++;
             });
         }
 
