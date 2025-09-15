@@ -1111,7 +1111,21 @@ class CapitalManager {
 
         const shareholders = StorageManager.getData(StorageManager.STORAGE_KEYS.SHAREHOLDERS) || [];
 
-        // Build printable HTML
+        // Compute totals (withdrawals reduce totals)
+        let totalUSD = 0;
+        let totalIQD = 0;
+        results.forEach(entry => {
+            const raw = parseFloat(entry.amount) || 0;
+            const isWithdrawal = (entry.type || '').toLowerCase() === 'withdrawal';
+            const signed = (isWithdrawal ? -1 : 1) * Math.abs(raw);
+            if (entry.currency === 'USD') totalUSD += signed;
+            else if (entry.currency === 'IQD') totalIQD += signed;
+        });
+
+        const totalUSDStr = this.formatCurrency(totalUSD, 'USD');
+        const totalIQDStr = this.formatCurrency(totalIQD, 'IQD');
+
+        // Build printable rows
         const rowsHtml = results.map(entry => {
             const shareholder = shareholders.find(s => s.id === entry.shareholderId);
             const isWithdrawal = (entry.type || '').toLowerCase() === 'withdrawal';
@@ -1142,6 +1156,12 @@ class CapitalManager {
                 thead th { background: #f3f4f6; }
                 th, td { border: 1px solid #ddd; padding: 8px; font-size: 12px; }
                 .meta { margin: 8px 0 12px; font-size: 12px; color: #555; }
+                .totals-row { display: flex; gap: 12px; margin-top: 12px; }
+                .total-card { flex: 1; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; background: #f9fafb; }
+                .total-card.usd { border-color: rgba(22,163,74,0.25); background: #ecfdf5; }
+                .total-card.iqd { border-color: rgba(29,78,216,0.25); background: #eff6ff; }
+                .total-card .label { font-weight: 700; color: #374151; margin-bottom: 6px; }
+                .total-card .value { font-size: 16px; font-weight: 800; color: #111827; }
             </style>
         `;
 
@@ -1173,6 +1193,16 @@ class CapitalManager {
                             ${rowsHtml}
                         </tbody>
                     </table>
+                    <div class="totals-row">
+                        <div class="total-card iqd">
+                            <div class="label">إجمالي الدينار</div>
+                            <div class="value">${totalIQDStr}</div>
+                        </div>
+                        <div class="total-card usd">
+                            <div class="label">إجمالي الدولار</div>
+                            <div class="value">${totalUSDStr}</div>
+                        </div>
+                    </div>
                 </div>
                 ${footer}
                 <script>setTimeout(function(){ window.print(); setTimeout(function(){ window.close(); }, 300); }, 200);</script>
