@@ -117,9 +117,35 @@ class AuthManager {
                     passwordMatch = (hashedInput === user.password);
                     console.log('AuthManager: استخدام التشفير مع salt');
                 } else {
-                    // Fallback for plain text passwords
-                    passwordMatch = (password === user.password);
-                    console.log('AuthManager: استخدام كلمة المرور النصية');
+                    // Fallback for legacy users without salt
+                    // 1) Try plain text compare
+                    if (password === user.password) {
+                        passwordMatch = true;
+                        console.log('AuthManager: استخدام كلمة المرور النصية (بدون salt)');
+                    } else {
+                        // 2) Try legacy hashed (simpleHash(password))
+                        const legacyHashed = this.simpleHash(password);
+                        if (legacyHashed === user.password) {
+                            passwordMatch = true;
+                            console.log('AuthManager: تطابق مع تشفير قديم بدون salt - سيتم الترقية');
+                            // Migrate to salted hash for future logins
+                            try {
+                                let users = StorageManager.getData(StorageManager.STORAGE_KEYS.USERS) || [];
+                                const idx = users.findIndex(u => u.username === username);
+                                if (idx !== -1) {
+                                    const newSalt = 'user-salt-' + Math.random().toString(36).slice(2);
+                                    users[idx].salt = newSalt;
+                                    users[idx].password = this.simpleHash(password + newSalt);
+                                    StorageManager.saveData(StorageManager.STORAGE_KEYS.USERS, users);
+                                    console.log('AuthManager: تمت ترقية كلمة المرور إلى صيغة salted');
+                                }
+                            } catch (mErr) {
+                                console.warn('AuthManager: فشل ترقية كلمة المرور:', mErr);
+                            }
+                        } else {
+                            console.log('AuthManager: لا تطابق مع صيغة بدون salt');
+                        }
+                    }
                 }
 
                 console.log('AuthManager: نتيجة مطابقة كلمة المرور:', passwordMatch);
@@ -208,6 +234,113 @@ class AuthManager {
     // Get user role
     getUserRole() {
         return this.currentUser?.role || 'guest';
+    }
+
+    // Return all users (without sensitive fields)
+    getAllUsers() {
+        try {
+            let users = StorageManager.getData(StorageManager.STORAGE_KEYS.USERS) || [];
+            if (!Array.isArray(users)) users = [];
+            // sanitize
+            return users.map(u => ({
+                id: u.id,
+                username: u.username,
+                name: u.name,
+                role: u.role,
+                permissions: u.permissions || [],
+                isActive: u.isActive !== false,
+                createdAt: u.createdAt
+            }));
+        } catch (e) {
+            console.error('AuthManager.getAllUsers error:', e);
+            return [];
+        }
+    }
+
+    // Create user (admin/manager only)
+    async createUser(userData) {
+        try {
+            if (!this.currentUser) {
+                return { success: false, message: 'يجب تسجيل الدخول أولاً' };
+            }
+            const role = this.currentUser.role || this.currentUser.username;
+            const isAllowed = (role === 'admin' || role === 'manager' || this.currentUser.username === 'admin' || this.currentUser.username === 'manager');
+            if (!isAllowed) {
+                return { success: false, message: 'ليس لديك صلاحية لإنشاء مستخدمين' };
+            }
+
+            // Basic validation
+            const username = (userData.username || '').trim();
+            const name = (userData.name || '').trim();
+            const password = userData.password || '';
+            const roleToSet = userData.role || 'user';
+            const permissions = Array.isArray(userData.permissions) ? userData.permissions : [];
+            if (!username || !name || !password) {
+                return { success: false, message: 'جميع الحقول مطلوبة' };
+            }
+            if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+                return { success: false, message: 'اسم المستخدم يجب أن يحتوي أحرف إنجليزية وأرقام فقط' };
+            }
+
+            let users = StorageManager.getData(StorageManager.STORAGE_KEYS.USERS) || [];
+            if (!Array.isArray(users)) users = [];
+            if (users.some(u => u.username === username)) {
+                return { success: false, message: 'اسم المستخدم موجود بالفعل' };
+            }
+
+            // Salt + simple hash compatible with login()
+            const salt = 'user-salt-' + Math.random().toString(36).slice(2);
+            const hashedPassword = this.simpleHash(password + salt);
+
+            const newUser = {
+                id: StorageManager.generateId(),
+                username,
+                password: hashedPassword,
+                salt,
+                name,
+                role: roleToSet,
+                permissions,
+                isActive: true,
+                createdAt: new Date().toISOString(),
+                createdBy: this.currentUser.id || this.currentUser.username || 'system'
+            };
+
+            users.push(newUser);
+            const ok = StorageManager.saveData(StorageManager.STORAGE_KEYS.USERS, users);
+            if (ok) {
+                return { success: true, message: 'تم إنشاء المستخدم بنجاح', user: { ...newUser, password: undefined, salt: undefined } };
+            }
+            return { success: false, message: 'فشل حفظ المستخدم' };
+        } catch (e) {
+            console.error('AuthManager.createUser error:', e);
+            return { success: false, message: 'حدث خطأ أثناء إنشاء المستخدم: ' + e.message };
+        }
+    }
+
+    // Deactivate user (admin/manager only)
+    async deactivateUser(userId) {
+        try {
+            if (!this.currentUser) {
+                return { success: false, message: 'يجب تسجيل الدخول أولاً' };
+            }
+            const role = this.currentUser.role || this.currentUser.username;
+            const isAllowed = (role === 'admin' || role === 'manager' || this.currentUser.username === 'admin' || this.currentUser.username === 'manager');
+            if (!isAllowed) {
+                return { success: false, message: 'ليس لديك صلاحية لإلغاء التفعيل' };
+            }
+
+            let users = StorageManager.getData(StorageManager.STORAGE_KEYS.USERS) || [];
+            const idx = users.findIndex(u => u.id === userId);
+            if (idx === -1) {
+                return { success: false, message: 'المستخدم غير موجود' };
+            }
+            users[idx].isActive = false;
+            const ok = StorageManager.saveData(StorageManager.STORAGE_KEYS.USERS, users);
+            return ok ? { success: true, message: 'تم إلغاء تفعيل المستخدم' } : { success: false, message: 'فشل حفظ الحالة' };
+        } catch (e) {
+            console.error('AuthManager.deactivateUser error:', e);
+            return { success: false, message: 'حدث خطأ أثناء العملية: ' + e.message };
+        }
     }
 }
 

@@ -2499,8 +2499,9 @@ class AccountingApp {
                 return { success: false, message: 'اسم المستخدم موجود بالفعل' };
             }
 
-            // Hash password (simple implementation)
-            const hashedPassword = this.hashPassword(userData.password);
+            // Hash password (simple implementation) with salt to be compatible with AuthManager
+            const salt = 'user-salt-' + Math.random().toString(36).slice(2);
+            const hashedPassword = this.hashPassword(userData.password + salt);
             console.log('Password hashed successfully');
 
             // Create new user with Arabic support
@@ -2512,6 +2513,7 @@ class AccountingApp {
                 role: userData.role || 'user',
                 permissions: userData.permissions || [],
                 isActive: true,
+                salt: salt,
                 createdAt: new Date().toISOString(),
                 createdBy: this.currentUser ? this.currentUser.id : 'system'
             };
