@@ -48,6 +48,11 @@ class AccountingApp {
         window.addEventListener('offline', () => {
             this.showNotification('تم قطع الاتصال - العمل في وضع عدم الاتصال', 'warning');
         });
+
+        // Keep credit-remaining cards in sync when data changes anywhere
+        document.addEventListener('dataChanged', () => {
+            try { this.updateCreditRemainCards(); } catch(e) { console.warn('updateCreditRemainCards failed', e); }
+        });
     }
 
     checkAuthStatus() {
@@ -143,8 +148,15 @@ class AccountingApp {
             currentUserElement.textContent = this.currentUser.username;
         }
 
-        // Load dashboard data
-        this.loadDashboardData();
+        // Load dashboard data (prefer DashboardManager to avoid duplicate logic)
+        if (window.dashboardManager && typeof window.dashboardManager.loadDashboardData === 'function') {
+            window.dashboardManager.loadDashboardData();
+        } else {
+            this.loadDashboardData();
+        }
+
+        // Ensure credit-remaining cards are updated as they are managed here
+        this.updateCreditRemainCards();
     }
 
     showSection(sectionName) {
@@ -178,7 +190,14 @@ class AccountingApp {
         // Load section-specific data
         switch (sectionName) {
             case 'dashboard':
-                this.loadDashboardData();
+                // Prefer DashboardManager for accurate, unified calculations
+                if (window.dashboardManager && typeof window.dashboardManager.loadDashboardData === 'function') {
+                    window.dashboardManager.loadDashboardData();
+                } else {
+                    this.loadDashboardData();
+                }
+                // Also refresh credit-remaining cards
+                this.updateCreditRemainCards();
                 break;
             case 'capital':
                 this.loadCapitalSection();
@@ -2710,6 +2729,24 @@ class AccountingApp {
         `;
 
         recentTransactionsElement.innerHTML = tableHTML;
+    }
+
+    // Update only the credit-remaining cards (used alongside DashboardManager)
+    updateCreditRemainCards() {
+        try {
+            const data = StorageManager.getAllData();
+            const totals = this.calculateTotals(data);
+            const creditRemainUSDElement = document.getElementById('creditRemainUSD');
+            const creditRemainIQDElement = document.getElementById('creditRemainIQD');
+            if (creditRemainUSDElement) {
+                creditRemainUSDElement.textContent = this.formatCurrency(totals.creditRemainUSD, 'USD');
+            }
+            if (creditRemainIQDElement) {
+                creditRemainIQDElement.textContent = this.formatCurrency(totals.creditRemainIQD, 'IQD');
+            }
+        } catch (e) {
+            console.warn('Failed to update credit remain cards', e);
+        }
     }
 
     formatCurrency(amount, currency) {
