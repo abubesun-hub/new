@@ -281,6 +281,16 @@ class CapitalManager {
                                 ${shareholders.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
                             </select>
                         </div>
+                        <!-- Shareholder balance panel (visible only for withdrawals) -->
+                        <div class="col-12 mb-3" id="withdrawalBalanceRow" style="display:none;">
+                            <div id="shareholderBalancePanel" class="alert alert-info mb-0 p-3">
+                                <div class="d-flex align-items-center flex-wrap gap-3">
+                                    <div class="me-3"><strong>الرصيد المتاح للمساهم:</strong></div>
+                                    <div class="badge bg-success" id="balanceUSD">$0.00</div>
+                                    <div class="badge bg-primary" id="balanceIQD">0 د.ع</div>
+                                </div>
+                            </div>
+                        </div>
                         <div class="col-md-6 mb-3">
                             <label for="currencyType" class="form-label">نوع العملة</label>
                             <select class="form-control neumorphic-input" id="currencyType" required>
@@ -785,6 +795,36 @@ class CapitalManager {
             e.preventDefault();
             this.saveCapitalEntry();
         });
+
+        // Live update of balance panel for withdrawals
+        const entryTypeEl = document.getElementById('entryType');
+        const shareholderEl = document.getElementById('shareholderSelect');
+        if (entryTypeEl) entryTypeEl.addEventListener('change', () => this.updateWithdrawalBalancePanel());
+        if (shareholderEl) shareholderEl.addEventListener('change', () => this.updateWithdrawalBalancePanel());
+        // Initialize state on load
+        this.updateWithdrawalBalancePanel();
+    }
+
+    // Show shareholder USD/IQD balances when withdrawing
+    updateWithdrawalBalancePanel() {
+        const type = (document.getElementById('entryType')?.value || 'deposit').toLowerCase();
+        const shareholderId = document.getElementById('shareholderSelect')?.value || '';
+        const row = document.getElementById('withdrawalBalanceRow');
+        const usdEl = document.getElementById('balanceUSD');
+        const iqdEl = document.getElementById('balanceIQD');
+
+        if (!row) return;
+
+        if (type !== 'withdrawal' || !shareholderId) {
+            row.style.display = 'none';
+            return;
+        }
+
+        // Fetch balance and render
+        const bal = this.getShareholderCapitalBalance(shareholderId);
+        if (usdEl) usdEl.textContent = this.formatCurrency(bal.USD || 0, 'USD');
+        if (iqdEl) iqdEl.textContent = this.formatCurrency(bal.IQD || 0, 'IQD');
+        row.style.display = '';
     }
 
     // Setup search form
