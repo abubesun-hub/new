@@ -257,6 +257,27 @@ class AuthManager {
         }
     }
 
+    // Get a single user by id (sanitized)
+    getUserById(userId) {
+        try {
+            const users = StorageManager.getData(StorageManager.STORAGE_KEYS.USERS) || [];
+            const u = users.find(x => x.id === userId);
+            if (!u) return null;
+            return {
+                id: u.id,
+                username: u.username,
+                name: u.name,
+                role: u.role,
+                permissions: u.permissions || [],
+                isActive: u.isActive !== false,
+                createdAt: u.createdAt
+            };
+        } catch (e) {
+            console.error('AuthManager.getUserById error:', e);
+            return null;
+        }
+    }
+
     // Create user (admin/manager only)
     async createUser(userData) {
         try {
@@ -340,6 +361,72 @@ class AuthManager {
         } catch (e) {
             console.error('AuthManager.deactivateUser error:', e);
             return { success: false, message: 'حدث خطأ أثناء العملية: ' + e.message };
+        }
+    }
+
+    // Activate user (admin/manager only)
+    async activateUser(userId) {
+        try {
+            if (!this.currentUser) {
+                return { success: false, message: 'يجب تسجيل الدخول أولاً' };
+            }
+            const role = this.currentUser.role || this.currentUser.username;
+            const isAllowed = (role === 'admin' || role === 'manager' || this.currentUser.username === 'admin' || this.currentUser.username === 'manager');
+            if (!isAllowed) {
+                return { success: false, message: 'ليس لديك صلاحية للتفعيل' };
+            }
+
+            let users = StorageManager.getData(StorageManager.STORAGE_KEYS.USERS) || [];
+            const idx = users.findIndex(u => u.id === userId);
+            if (idx === -1) {
+                return { success: false, message: 'المستخدم غير موجود' };
+            }
+            users[idx].isActive = true;
+            const ok = StorageManager.saveData(StorageManager.STORAGE_KEYS.USERS, users);
+            return ok ? { success: true, message: 'تم تفعيل المستخدم' } : { success: false, message: 'فشل حفظ الحالة' };
+        } catch (e) {
+            console.error('AuthManager.activateUser error:', e);
+            return { success: false, message: 'حدث خطأ أثناء العملية: ' + e.message };
+        }
+    }
+
+    // Update user fields (name, role, permissions, isActive) and optionally reset password
+    async updateUser(userId, updateData) {
+        try {
+            if (!this.currentUser) {
+                return { success: false, message: 'يجب تسجيل الدخول أولاً' };
+            }
+            const role = this.currentUser.role || this.currentUser.username;
+            const isAllowed = (role === 'admin' || role === 'manager' || this.currentUser.username === 'admin' || this.currentUser.username === 'manager');
+            if (!isAllowed) {
+                return { success: false, message: 'ليس لديك صلاحية للتعديل' };
+            }
+
+            let users = StorageManager.getData(StorageManager.STORAGE_KEYS.USERS) || [];
+            const idx = users.findIndex(u => u.id === userId);
+            if (idx === -1) {
+                return { success: false, message: 'المستخدم غير موجود' };
+            }
+
+            // Update safe fields
+            if (typeof updateData.name === 'string') users[idx].name = updateData.name.trim();
+            if (typeof updateData.role === 'string') users[idx].role = updateData.role;
+            if (Array.isArray(updateData.permissions)) users[idx].permissions = updateData.permissions;
+            if (typeof updateData.isActive === 'boolean') users[idx].isActive = updateData.isActive;
+
+            // Optional password reset
+            if (updateData.newPassword && updateData.newPassword.length >= 6) {
+                const salt = 'user-salt-' + Math.random().toString(36).slice(2);
+                users[idx].salt = salt;
+                users[idx].password = this.simpleHash(updateData.newPassword + salt);
+                users[idx].passwordChangedAt = new Date().toISOString();
+            }
+
+            const ok = StorageManager.saveData(StorageManager.STORAGE_KEYS.USERS, users);
+            return ok ? { success: true, message: 'تم حفظ التعديلات' } : { success: false, message: 'فشل حفظ البيانات' };
+        } catch (e) {
+            console.error('AuthManager.updateUser error:', e);
+            return { success: false, message: 'حدث خطأ أثناء التعديل: ' + e.message };
         }
     }
 }

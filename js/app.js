@@ -438,13 +438,19 @@ class AccountingApp {
                                 <td><span class="badge bg-${user.isActive ? 'success' : 'danger'}">${user.isActive ? 'نشط' : 'معطل'}</span></td>
                                 <td>${this.formatDate(user.createdAt)}</td>
                                 <td>
-                                    <div class="btn-group btn-group-sm">
-                                        <button class="btn btn-outline-primary" onclick="app.editUser('${user.id}')">
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button class="btn btn-outline-primary" title="تعديل" onclick="app.editUser('${user.id}')">
                                             <i class="bi bi-pencil"></i>
                                         </button>
-                                        <button class="btn btn-outline-danger" onclick="app.deactivateUser('${user.id}')">
-                                            <i class="bi bi-person-x"></i>
-                                        </button>
+                                        ${user.isActive ? `
+                                            <button class="btn btn-outline-danger" title="تعطيل" onclick="app.deactivateUser('${user.id}')">
+                                                <i class="bi bi-person-x"></i>
+                                            </button>
+                                        ` : `
+                                            <button class="btn btn-outline-success" title="تفعيل" onclick="app.activateUser('${user.id}')">
+                                                <i class="bi bi-person-check"></i>
+                                            </button>
+                                        `}
                                     </div>
                                 </td>
                             </tr>
@@ -455,6 +461,8 @@ class AccountingApp {
         `;
 
         document.getElementById('usersContent').innerHTML = usersListHTML;
+        // Ensure the edit modal exists at body level (not inside transformed containers)
+        this.ensureEditUserModal();
     }
 
     // Generate Capital Report HTML
@@ -2548,12 +2556,136 @@ class AccountingApp {
             hash = ((hash << 5) - hash) + char;
             hash = hash & hash; // Convert to 32-bit integer
         }
-        return hash.toString();
+        return Math.abs(hash).toString(16); // hex to align with AuthManager.simpleHash
     }
 
+    // Modal markup for editing user
+    renderEditUserModal() {
+        return `
+        <div class="modal fade" id="editUserModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">تعديل المستخدم</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="editUserForm" class="row g-3">
+                            <input type="hidden" id="editUserId" />
+                            <div class="col-12">
+                                <label class="form-label">الاسم</label>
+                                <input type="text" class="form-control" id="editName" required />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">الدور</label>
+                                <select class="form-select" id="editRole">
+                                    <option value="user">user</option>
+                                    <option value="accountant">accountant</option>
+                                    <option value="manager">manager</option>
+                                    <option value="admin">admin</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">الحالة</label>
+                                <select class="form-select" id="editIsActive">
+                                    <option value="true">نشط</option>
+                                    <option value="false">معطل</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">كلمة مرور جديدة (اختياري)</label>
+                                <input type="password" class="form-control" id="editNewPassword" placeholder="اتركها فارغة للإبقاء على كلمة المرور" />
+                                <div class="form-text">ستُطبّق كلمة المرور الجديدة إن أدخلتها بطول 6 أحرف على الأقل.</div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                        <button type="button" class="btn btn-primary" id="saveEditUserBtn">حفظ</button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    // Create the edit modal once and append to body to avoid position issues
+    ensureEditUserModal() {
+        if (!document.getElementById('editUserModal')) {
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = this.renderEditUserModal();
+            // Append only the modal element
+            const modalEl = wrapper.firstElementChild;
+            document.body.appendChild(modalEl);
+        }
+    }
+
+    // Open edit modal and populate
     editUser(userId) {
-        // Implementation for editing user
-        this.showNotification('تعديل المستخدم - قيد التطوير', 'info');
+        try {
+            // Ensure modal exists at body level before using
+            this.ensureEditUserModal();
+            let user;
+            if (window.AuthManager && typeof window.AuthManager.getUserById === 'function') {
+                user = window.AuthManager.getUserById(userId);
+            } else {
+                // Fallback: direct from storage
+                const users = StorageManager.getData(StorageManager.STORAGE_KEYS.USERS) || [];
+                const u = users.find(x => x.id === userId);
+                if (u) {
+                    user = { id: u.id, username: u.username, name: u.name, role: u.role, isActive: u.isActive !== false };
+                }
+            }
+            if (!user) {
+                this.showNotification('المستخدم غير موجود', 'error');
+                return;
+            }
+            // Fill modal fields
+            document.getElementById('editUserId').value = user.id;
+            document.getElementById('editName').value = user.name || '';
+            document.getElementById('editRole').value = user.role || 'user';
+            document.getElementById('editIsActive').value = (user.isActive ? 'true' : 'false');
+
+            // Wire save button once
+            const saveBtn = document.getElementById('saveEditUserBtn');
+            saveBtn.onclick = async () => {
+                const id = document.getElementById('editUserId').value;
+                const name = document.getElementById('editName').value.trim();
+                const role = document.getElementById('editRole').value;
+                const isActive = document.getElementById('editIsActive').value === 'true';
+                const newPassword = document.getElementById('editNewPassword').value;
+                if (!name) { this.showNotification('الاسم مطلوب', 'error'); return; }
+                // Prefer AuthManager.updateUser
+                if (window.AuthManager && typeof window.AuthManager.updateUser === 'function') {
+                    const result = await window.AuthManager.updateUser(id, { name, role, isActive, newPassword });
+                    if (result.success) {
+                        this.showNotification(result.message, 'success');
+                        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('editUserModal'));
+                        modal.hide();
+                        this.showUsersList();
+                    } else {
+                        this.showNotification(result.message, 'error');
+                    }
+                } else {
+                    // Fallback direct save (simplified)
+                    const users = StorageManager.getData(StorageManager.STORAGE_KEYS.USERS) || [];
+                    const idx = users.findIndex(u => u.id === id);
+                    if (idx !== -1) {
+                        users[idx].name = name; users[idx].role = role; users[idx].isActive = isActive;
+                        StorageManager.saveData(StorageManager.STORAGE_KEYS.USERS, users);
+                        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('editUserModal'));
+                        modal.hide();
+                        this.showUsersList();
+                        this.showNotification('تم حفظ التعديلات', 'success');
+                    }
+                }
+            };
+
+            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('editUserModal'), { backdrop: true });
+            modal.show();
+        } catch (e) {
+            console.error('editUser error:', e);
+            this.showNotification('حدث خطأ أثناء فتح نافذة التعديل', 'error');
+        }
     }
 
     deactivateUser(userId) {
@@ -2566,6 +2698,30 @@ class AccountingApp {
                     this.showNotification(result.message, 'error');
                 }
             });
+        }
+    }
+
+    activateUser(userId) {
+        if (confirm('هل تريد تفعيل هذا المستخدم؟')) {
+            if (window.AuthManager && typeof window.AuthManager.activateUser === 'function') {
+                window.AuthManager.activateUser(userId).then(result => {
+                    if (result.success) {
+                        this.showNotification(result.message, 'success');
+                        this.showUsersList();
+                    } else {
+                        this.showNotification(result.message, 'error');
+                    }
+                });
+            } else {
+                const users = StorageManager.getData(StorageManager.STORAGE_KEYS.USERS) || [];
+                const idx = users.findIndex(u => u.id === userId);
+                if (idx !== -1) {
+                    users[idx].isActive = true;
+                    StorageManager.saveData(StorageManager.STORAGE_KEYS.USERS, users);
+                    this.showUsersList();
+                    this.showNotification('تم تفعيل المستخدم', 'success');
+                }
+            }
         }
     }
 
