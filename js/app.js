@@ -1433,7 +1433,17 @@ class AccountingApp {
     }
 
     generateExpensesReport() {
-        this.showExpensesReportPage();
+        // Show 'Under Development' message instead of loading the report page
+        try {
+            if (typeof this.showNotification === 'function') {
+                this.showNotification('تقرير المصروفات قيد التطوير', 'warning');
+            } else {
+                alert('تقرير المصروفات قيد التطوير');
+            }
+        } catch (e) {
+            try { alert('تقرير المصروفات قيد التطوير'); } catch(_) {}
+        }
+        return;
     }
 
     showExpensesReportPage() {

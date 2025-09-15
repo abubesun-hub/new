@@ -52,6 +52,7 @@ class ReportsManager {
         
         const report = {
             title: 'تقرير المصروفات',
+            type: 'expenses',
             generatedAt: new Date().toISOString(),
             period: this.getCurrentPeriod(),
             data: expensesData,
@@ -406,8 +407,16 @@ class ReportsManager {
         // Add modal to body
         document.body.insertAdjacentHTML('beforeend', modalHTML);
 
-        // Show modal
-        const modal = new bootstrap.Modal(document.getElementById('reportModal'));
+        // Show modal and setup type-specific interactions when shown
+        const modalEl = document.getElementById('reportModal');
+        const modal = new bootstrap.Modal(modalEl);
+        modalEl.addEventListener('shown.bs.modal', () => {
+            try {
+                this.afterReportDisplayed();
+            } catch (e) {
+                console.warn('afterReportDisplayed error', e);
+            }
+        }, { once: true });
         modal.show();
     }
 
@@ -443,7 +452,12 @@ class ReportsManager {
 
     // Generate report content
     generateReportContent(report) {
-        // This will be implemented based on the report type
+        // Route based on report type
+        if (report.type === 'expenses') {
+            return this.generateExpensesReportContent(report);
+        }
+
+        // Generic fallback content
         return `
             <div class="report-header mb-4">
                 <h3>${report.title}</h3>
@@ -454,6 +468,239 @@ class ReportsManager {
                 <pre>${JSON.stringify(report.summary, null, 2)}</pre>
             </div>
         `;
+    }
+
+    // Specialized: Expenses report content (rebuilt from scratch for accuracy)
+    generateExpensesReportContent(report) {
+        // Return empty content as requested (delete all contents of Expense Report)
+        return '';
+    }
+
+    renderExpenseCategoryRow(c) {
+        const last = c.lastDate ? new Date(c.lastDate) : null;
+        const lastStr = last ? last.toLocaleDateString('ar-IQ') : '-';
+        return `
+            <tr data-category="${c.name}">
+                <td>${c.name}</td>
+                <td><span class="excat-badge" title="عدد القيود">${c.count}</span></td>
+                <td>${this.formatCurrency(c.totalUSD,'USD')}</td>
+                <td>${this.formatCurrency(c.totalIQD,'IQD')}</td>
+                <td>${this.formatCurrency(c.avgUSD,'USD')}</td>
+                <td>${this.formatCurrency(c.avgIQD,'IQD')}</td>
+                <td>${lastStr}</td>
+                <td class="text-center excat-actions">
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-sm btn-outline-primary" data-action="view" title="عرض التفاصيل"><i class="bi bi-eye"></i></button>
+                        <button class="btn btn-sm btn-outline-success" data-action="export" title="تصدير"><i class="bi bi-download"></i></button>
+                        <button class="btn btn-sm btn-outline-warning" data-action="print" title="طباعة"><i class="bi bi-printer"></i></button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+
+    // After the report modal is displayed, wire up UI for expenses categories
+    afterReportDisplayed() {
+        if (!this.currentReport || this.currentReport.type !== 'expenses') return;
+
+        // Wire search/sort and actions
+        const data = StorageManager.getAllData();
+        const allExpenses = Array.isArray(data?.expenses) ? data.expenses : [];
+
+        const tbody = document.getElementById('expenseCatTableBody');
+        const searchInput = document.getElementById('expenseCatSearch');
+        const sortBySel = document.getElementById('expenseCatSortBy');
+        const sortDirSel = document.getElementById('expenseCatSortDir');
+        const dateFrom = document.getElementById('expDateFrom');
+        const dateTo = document.getElementById('expDateTo');
+        const tableWrapper = document.getElementById('expenseCatTableWrapper');
+
+        const updateCards = (list, cats) => {
+            const totUSD = list.filter(e=>e.currency==='USD').reduce((s,e)=> s + (parseFloat(e.amount)||0), 0);
+            const totIQD = list.filter(e=>e.currency==='IQD').reduce((s,e)=> s + (parseFloat(e.amount)||0), 0);
+            const el = (id, val)=>{ const n=document.getElementById(id); if(n) n.textContent=val; };
+            el('exTotUSD', this.formatCurrency(totUSD,'USD'));
+            el('exTotIQD', this.formatCurrency(totIQD,'IQD'));
+            el('exTotCount', list.length.toString());
+            el('exTotCats', cats.length.toString());
+        };
+
+        const getFiltered = () => {
+            const q = (searchInput?.value || '').trim().toLowerCase();
+            const from = dateFrom?.value ? new Date(dateFrom.value) : null;
+            const to = dateTo?.value ? new Date(dateTo.value) : null;
+            return allExpenses.filter(e => {
+                // date filter
+                if (from || to) {
+                    const d = e.date ? new Date(e.date) : null;
+                    if (!d) return false;
+                    if (from && d < new Date(from.getFullYear(), from.getMonth(), from.getDate())) return false;
+                    if (to && d > new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23,59,59,999)) return false;
+                }
+                if (!q) return true;
+                const txt = [e.category, e.description, e.notes, e.project, e.paymentMethod].map(x=> (x||'').toString().toLowerCase()).join(' ');
+                return txt.includes(q);
+            });
+        };
+
+        const applyRender = () => {
+            const filtered = getFiltered();
+            let cats = this.computeExpenseCategoryStats(filtered);
+            const by = sortBySel?.value || 'name';
+            const dir = sortDirSel?.value || 'asc';
+            cats.sort((a,b)=>{
+                let va, vb;
+                switch(by){
+                    case 'count': va=a.count; vb=b.count; break;
+                    case 'totalUSD': va=a.totalUSD; vb=b.totalUSD; break;
+                    case 'totalIQD': va=a.totalIQD; vb=b.totalIQD; break;
+                    default: va=a.name; vb=b.name; break;
+                }
+                const cmp = (typeof va === 'string') ? va.localeCompare(vb,'ar') : (va - vb);
+                return dir === 'asc' ? cmp : -cmp;
+            });
+            if (tbody) tbody.innerHTML = cats.map(c => this.renderExpenseCategoryRow(c)).join('');
+            updateCards(filtered, cats);
+        };
+
+        [searchInput, sortBySel, sortDirSel, dateFrom, dateTo].forEach(el=>{ if(el) el.addEventListener('input', applyRender); });
+        document.getElementById('expenseCatShowTableBtn')?.addEventListener('click', ()=>{
+            tableWrapper?.scrollIntoView({ behavior:'smooth', block:'start' });
+        });
+
+        // Delegated actions on table
+        document.getElementById('reportModal')?.addEventListener('click', (ev)=>{
+            const btn = ev.target.closest('.excat-actions .btn');
+            if(!btn) return;
+            const tr = btn.closest('tr');
+            const cat = tr?.getAttribute('data-category');
+            const action = btn.getAttribute('data-action');
+            if(!cat || !action) return;
+            const filtered = getFiltered();
+            if(action==='view') this.openExpenseCategoryDetails(cat, filtered);
+            else if(action==='export') this.exportExpenseCategory(cat, filtered);
+            else if(action==='print') this.printExpenseCategory(cat, filtered);
+        });
+
+        // Initial render
+        applyRender();
+    }
+
+    // Compute per-category stats from raw expenses
+    computeExpenseCategoryStats(expenses) {
+        const map = new Map();
+        (expenses||[]).forEach(e => {
+            const name = e.category || 'غير محدد';
+            if(!map.has(name)) map.set(name, { name, count:0, totalUSD:0, totalIQD:0, countUSD:0, countIQD:0, lastDate:null });
+            const obj = map.get(name);
+            const amount = parseFloat(e.amount) || 0;
+            if (e.currency === 'USD') { obj.totalUSD += amount; obj.countUSD++; }
+            else if (e.currency === 'IQD') { obj.totalIQD += amount; obj.countIQD++; }
+            obj.count++;
+            if(e.date){ const d = new Date(e.date).toISOString(); if(!obj.lastDate || d > obj.lastDate) obj.lastDate = d; }
+        });
+        return Array.from(map.values()).map(o => ({
+            ...o,
+            avgUSD: o.countUSD ? (o.totalUSD / o.countUSD) : 0,
+            avgIQD: o.countIQD ? (o.totalIQD / o.countIQD) : 0
+        }));
+    }
+
+    // Drill-down modal with expenses of a category
+    openExpenseCategoryDetails(categoryName, allExpenses) {
+        const list = (allExpenses||[]).filter(e => (e.category || 'غير محدد') === categoryName);
+        const totalUSD = list.filter(e=>e.currency==='USD').reduce((s,e)=> s + (parseFloat(e.amount)||0), 0);
+        const totalIQD = list.filter(e=>e.currency==='IQD').reduce((s,e)=> s + (parseFloat(e.amount)||0), 0);
+        const rows = list.map(e=>{
+            const date = e.date ? new Date(e.date).toLocaleDateString('ar-IQ') : '-';
+            const usd = e.currency==='USD' ? this.formatCurrency(e.amount,'USD') : '-';
+            const iqd = e.currency==='IQD' ? this.formatCurrency(e.amount,'IQD') : '-';
+            const desc = (e.description || e.notes || '').toString();
+            const rec = e.receiptNumber || '';
+            const reg = e.registrationNumber || '';
+            return `<tr><td>${date}</td><td>${desc}</td><td>${usd}</td><td>${iqd}</td><td>${e.paymentMethod||''}</td><td>${e.project||''}</td><td>${rec}</td><td>${reg}</td></tr>`;
+        }).join('');
+
+        const modalId = 'categoryDetailsModal';
+        document.getElementById(modalId)?.remove();
+        const html = `
+            <div class="modal fade" id="${modalId}" tabindex="-1">
+                <div class="modal-dialog modal-xl">
+                    <div class="modal-content neumorphic-card">
+                        <div class="modal-header">
+                            <h5 class="modal-title">تفاصيل الفئة: ${categoryName}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-2">
+                                <span class="badge text-bg-warning me-1">إجمالي الدولار: ${this.formatCurrency(totalUSD,'USD')}</span>
+                                <span class="badge text-bg-info">إجمالي الدينار: ${this.formatCurrency(totalIQD,'IQD')}</span>
+                            </div>
+                            <div class="table-responsive" style="max-height:60vh; overflow:auto;">
+                                <table class="table table-striped table-sm align-middle">
+                                    <thead><tr><th>التاريخ</th><th>الوصف</th><th>$</th><th>د.ع</th><th>طريقة الدفع</th><th>المشروع</th><th>رقم الوصل</th><th>رقم القيد</th></tr></thead>
+                                    <tbody>${rows}</tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+                            <button type="button" class="btn btn-info" id="printCatDetailsBtn"><i class="bi bi-printer me-1"></i>طباعة</button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        document.body.insertAdjacentHTML('beforeend', html);
+        const m = new bootstrap.Modal(document.getElementById(modalId));
+        document.getElementById(modalId).addEventListener('shown.bs.modal', ()=>{
+            document.getElementById('printCatDetailsBtn')?.addEventListener('click', ()=>{
+                this.printExpenseCategory(categoryName, allExpenses);
+            });
+        }, { once:true });
+        m.show();
+    }
+
+    exportExpenseCategory(categoryName, allExpenses) {
+        const list = (allExpenses||[]).filter(e => (e.category || 'غير محدد') === categoryName);
+        const payload = { category: categoryName, count: list.length, items: list };
+        const blob = new Blob([JSON.stringify(payload,null,2)], { type:'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `category_${categoryName}_${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+    }
+
+    printExpenseCategory(categoryName, allExpenses) {
+        const list = (allExpenses||[]).filter(e => (e.category || 'غير محدد') === categoryName);
+        const totalUSD = list.filter(e=>e.currency==='USD').reduce((s,e)=> s + (parseFloat(e.amount)||0), 0);
+        const totalIQD = list.filter(e=>e.currency==='IQD').reduce((s,e)=> s + (parseFloat(e.amount)||0), 0);
+        const rows = list.map((e,idx)=>{
+            const date = e.date ? new Date(e.date).toLocaleDateString('ar-IQ') : '-';
+            const usd = e.currency==='USD' ? this.formatCurrency(e.amount,'USD') : '-';
+            const iqd = e.currency==='IQD' ? this.formatCurrency(e.amount,'IQD') : '-';
+            return `<tr><td>${idx+1}</td><td>${date}</td><td>${e.description||''}</td><td>${usd}</td><td>${iqd}</td><td>${e.paymentMethod||''}</td><td>${e.project||''}</td><td>${e.receiptNumber||''}</td><td>${e.registrationNumber||''}</td></tr>`;
+        }).join('');
+
+        const title = `تقرير فئة المصروفات: ${categoryName}`;
+        const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML(title) : '';
+        const html = `
+            <!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${title}</title>
+            <link rel="stylesheet" href="css/style.css"></head><body>
+            ${header}
+            <div class="print-body">
+                <div class="mb-2">
+                    <strong>إجمالي الدولار:</strong> ${this.formatCurrency(totalUSD,'USD')} &nbsp; | &nbsp;
+                    <strong>إجمالي الدينار:</strong> ${this.formatCurrency(totalIQD,'IQD')}
+                </div>
+                <div class="table-responsive"><table class="table table-bordered table-sm">
+                    <thead><tr><th>#</th><th>التاريخ</th><th>الوصف</th><th>$</th><th>د.ع</th><th>طريقة الدفع</th><th>المشروع</th><th>رقم الوصل</th><th>رقم القيد</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table></div>
+            </div>
+            ${typeof buildPrintFooterHTML==='function'? buildPrintFooterHTML():''}
+            </body></html>`;
+        const w = window.open('', '_blank', 'width=1100,height=800');
+        w.document.open(); w.document.write(html); w.document.close(); w.onload = () => w.print();
     }
 
     // Export report
