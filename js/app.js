@@ -1488,17 +1488,11 @@ class AccountingApp {
                                 </button>
                             </div>
                         </div>
-                        <div class="text-muted small mt-2">ملاحظة: "رصيد أول الفترة" يُحتسب من جميع قيود رأس المال قبل تاريخ "من" لكل مساهم.</div>
+                        
                     </div>
                 </div>
 
                 <div class="row mb-3">
-                    <div class="col-md-3 mb-2">
-                        <div class="neumorphic-card text-center p-3">
-                            <div class="text-muted">إجمالي رصيد أول (دولار)</div>
-                            <div id="gcapOpenUSD" class="fw-bold text-secondary">$0.00</div>
-                        </div>
-                    </div>
                     <div class="col-md-3 mb-2">
                         <div class="neumorphic-card text-center p-3">
                             <div class="text-muted">إجمالي المودع (دولار)</div>
@@ -1515,12 +1509,6 @@ class AccountingApp {
                         <div class="neumorphic-card text-center p-3">
                             <div class="text-muted">إجمالي الرصيد (دولار)</div>
                             <div id="gcapBalUSD" class="fw-bold text-primary">$0.00</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3 mb-2">
-                        <div class="neumorphic-card text-center p-3">
-                            <div class="text-muted">إجمالي رصيد أول (دينار)</div>
-                            <div id="gcapOpenIQD" class="fw-bold text-secondary">0 د.ع</div>
                         </div>
                     </div>
                     <div class="col-md-3 mb-2">
@@ -1640,9 +1628,6 @@ class AccountingApp {
         // Compute balances: opening + deposits - withdrawals per currency
         const rows = Array.from(agg.values()).map(r => ({
             ...r,
-            // opening stored as signed net, display absolute in table column
-            openUSDDisp: r.openUSD,
-            openIQDDisp: r.openIQD,
             balUSD: (r.openUSD) + (r.depUSD) - (r.withUSD),
             balIQD: (r.openIQD) + (r.depIQD) - (r.withIQD)
         })).sort((a,b) => a.name.localeCompare(b.name, 'ar'));
@@ -1664,11 +1649,9 @@ class AccountingApp {
             <tr>
                 <td>${i+1}</td>
                 <td>${r.name}</td>
-                <td class="text-secondary">${this.formatCurrency(r.openIQDDisp,'IQD')}</td>
                 <td class="text-success">${this.formatCurrency(r.depIQD,'IQD')}</td>
                 <td class="text-danger">${this.formatCurrency(r.withIQD,'IQD')}</td>
                 <td class="text-primary fw-bold">${this.formatCurrency(r.balIQD,'IQD')}</td>
-                <td class="text-secondary">${this.formatCurrency(r.openUSDDisp,'USD')}</td>
                 <td class="text-success">${this.formatCurrency(r.depUSD,'USD')}</td>
                 <td class="text-danger">${this.formatCurrency(r.withUSD,'USD')}</td>
                 <td class="text-primary fw-bold">${this.formatCurrency(r.balUSD,'USD')}</td>
@@ -1677,9 +1660,9 @@ class AccountingApp {
 
         // Totals
         const totals = rows.reduce((a,r)=>{
-            a.openUSD += r.openUSDDisp; a.depUSD += r.depUSD; a.withUSD += r.withUSD; a.balUSD += r.balUSD;
-            a.openIQD += r.openIQDDisp; a.depIQD += r.depIQD; a.withIQD += r.withIQD; a.balIQD += r.balIQD; return a;
-        }, {openUSD:0,depUSD:0,withUSD:0,balUSD:0,openIQD:0,depIQD:0,withIQD:0,balIQD:0});
+            a.depUSD += r.depUSD; a.withUSD += r.withUSD; a.balUSD += r.balUSD;
+            a.depIQD += r.depIQD; a.withIQD += r.withIQD; a.balIQD += r.balIQD; return a;
+        }, {depUSD:0,withUSD:0,balUSD:0,depIQD:0,withIQD:0,balIQD:0});
 
         wrap.innerHTML = `
             <table class="table table-sm table-striped align-middle">
@@ -1687,11 +1670,9 @@ class AccountingApp {
                     <tr>
                         <th>#</th>
                         <th>اسم المساهم</th>
-                        <th>رصيد أول الفترة د.ع</th>
                         <th>المبلغ المودع د.ع</th>
                         <th>المبلغ المسحوب د.ع</th>
                         <th>رصيده د.ع</th>
-                        <th>رصيد أول الفترة دولار</th>
                         <th>المبلغ المودع دولار</th>
                         <th>المبلغ المسحوب دولار</th>
                         <th>رصيده دولار</th>
@@ -1701,11 +1682,9 @@ class AccountingApp {
                 <tfoot class="table-light">
                     <tr class="fw-bold">
                         <td colspan="2" class="text-center">الإجمالي</td>
-                        <td>${this.formatCurrency(totals.openIQD,'IQD')}</td>
                         <td>${this.formatCurrency(totals.depIQD,'IQD')}</td>
                         <td>${this.formatCurrency(totals.withIQD,'IQD')}</td>
                         <td>${this.formatCurrency(totals.balIQD,'IQD')}</td>
-                        <td>${this.formatCurrency(totals.openUSD,'USD')}</td>
                         <td>${this.formatCurrency(totals.depUSD,'USD')}</td>
                         <td>${this.formatCurrency(totals.withUSD,'USD')}</td>
                         <td>${this.formatCurrency(totals.balUSD,'USD')}</td>
@@ -1717,15 +1696,16 @@ class AccountingApp {
 
     updateGeneralCapitalReportSummary(rows) {
         const sum = rows.reduce((a,r)=>{
-            a.openUSD += r.openUSDDisp; a.depUSD += r.depUSD; a.withUSD += r.withUSD; a.balUSD += r.balUSD;
-            a.openIQD += r.openIQDDisp; a.depIQD += r.depIQD; a.withIQD += r.withIQD; a.balIQD += r.balIQD; return a;
-        }, {openUSD:0,depUSD:0,withUSD:0,balUSD:0,openIQD:0,depIQD:0,withIQD:0,balIQD:0});
+            a.depUSD += r.depUSD; a.withUSD += r.withUSD; a.balUSD += r.balUSD;
+            a.depIQD += r.depIQD; a.withIQD += r.withIQD; a.balIQD += r.balIQD; return a;
+        }, {depUSD:0,withUSD:0,balUSD:0,depIQD:0,withIQD:0,balIQD:0});
         const set = (id, val, cur) => { const el = document.getElementById(id); if (el) el.textContent = this.formatCurrency(val, cur); };
-        set('gcapOpenUSD', sum.openUSD, 'USD');
+        // Opening balances removed from report; display as 0
+        set('gcapOpenUSD', 0, 'USD');
         set('gcapDepUSD', sum.depUSD, 'USD');
         set('gcapWithUSD', sum.withUSD, 'USD');
         set('gcapBalUSD', sum.balUSD, 'USD');
-        set('gcapOpenIQD', sum.openIQD, 'IQD');
+        set('gcapOpenIQD', 0, 'IQD');
         set('gcapDepIQD', sum.depIQD, 'IQD');
         set('gcapWithIQD', sum.withIQD, 'IQD');
         set('gcapBalIQD', sum.balIQD, 'IQD');
@@ -1736,13 +1716,11 @@ class AccountingApp {
         if (!wrap) return;
         const headerHTML = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('تقرير رأس المال العام') : '';
         const win = window.open('', '_blank', 'width=1200,height=800');
-        const html = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>تقرير رأس المال العام</title><style>body{font-family:Arial,sans-serif;margin:20px;direction:rtl;color:#333} table{width:100%;border-collapse:collapse} th,td{border:1px solid #333;padding:8px;text-align:center} thead{background:#222;color:#fff} .sum{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0} .card{border:1px solid #ddd;border-radius:8px;padding:10px}</style></head><body>${headerHTML}<div class="sum">`+
-            `<div class='card'><div>رصيد أول $</div><div class='fw-bold'>${document.getElementById('gcapOpenUSD')?.textContent || '$0.00'}</div></div>`+
+        const html = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>تقرير رأس المال العام</title><style>body{font-family:Arial,sans-serif;margin:20px;direction:rtl;color:#333} table{width:100%;border-collapse:collapse} th,td{border:1px solid #333;padding:8px;text-align:center} thead{background:#222;color:#fff} .sum{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0} .card{border:1px solid #ddd;border-radius:8px;padding:10px}</style></head><body>${headerHTML}<div class="sum">`+
             `<div class='card'><div>المودع $</div><div class='fw-bold'>${document.getElementById('gcapDepUSD')?.textContent || '$0.00'}</div></div>`+
             `<div class='card'><div>المسحوب $</div><div class='fw-bold'>${document.getElementById('gcapWithUSD')?.textContent || '$0.00'}</div></div>`+
             `<div class='card'><div>الرصيد $</div><div class='fw-bold'>${document.getElementById('gcapBalUSD')?.textContent || '$0.00'}</div></div>`+
             `</div><div class="sum">`+
-            `<div class='card'><div>رصيد أول د.ع</div><div class='fw-bold'>${document.getElementById('gcapOpenIQD')?.textContent || '0 د.ع'}</div></div>`+
             `<div class='card'><div>المودع د.ع</div><div class='fw-bold'>${document.getElementById('gcapDepIQD')?.textContent || '0 د.ع'}</div></div>`+
             `<div class='card'><div>المسحوب د.ع</div><div class='fw-bold'>${document.getElementById('gcapWithIQD')?.textContent || '0 د.ع'}</div></div>`+
             `<div class='card'><div>الرصيد د.ع</div><div class='fw-bold'>${document.getElementById('gcapBalIQD')?.textContent || '0 د.ع'}</div></div>`+
