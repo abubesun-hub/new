@@ -8,6 +8,7 @@ class StorageManager {
         SETTINGS: 'accounting_settings',
         BACKUP: 'accounting_backup',
     ACCOUNTING_GUIDE: 'accounting_guide',
+    ACCOUNTING_GUIDE_CATEGORIES: 'accounting_guide_categories',
     CREDIT_PURCHASE_SUPPLIERS: 'credit_purchase_suppliers', // موردو الشراء بالآجل
     CREDIT_PURCHASES: 'credit_purchases' // قيود الشراء بالآجل
     };
@@ -147,6 +148,25 @@ class StorageManager {
                 }
             };
             this.saveData(this.STORAGE_KEYS.SETTINGS, defaultSettings);
+        }
+        // Default main categories for Accounting Guide (can be extended by user)
+        if (!this.getData(this.STORAGE_KEYS.ACCOUNTING_GUIDE_CATEGORIES)) {
+            const defaultGuideCategories = [
+                'مواد البناء',
+                'العمالة',
+                'المعدات والآلات',
+                'النقل والمواصلات',
+                'الوقود والطاقة',
+                'الصيانة والإصلاح',
+                'الرواتب والأجور',
+                'التأمين',
+                'الضرائب والرسوم',
+                'المكتب والإدارة',
+                'التسويق والإعلان',
+                'الاستشارات المهنية',
+                'أخرى'
+            ];
+            this.saveData(this.STORAGE_KEYS.ACCOUNTING_GUIDE_CATEGORIES, defaultGuideCategories);
         }
         // مفاتيح الشراء بالآجل الجديدة
         if (!this.getData(this.STORAGE_KEYS.CREDIT_PURCHASE_SUPPLIERS)) {

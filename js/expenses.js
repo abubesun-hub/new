@@ -3084,6 +3084,7 @@ class ExpensesManager {
 
     // Render add guide form
     renderAddGuideForm() {
+        const categories = this.getGuideMainCategories();
         return `
             <div class="neumorphic-card">
                 <div class="card-header">
@@ -3103,22 +3104,21 @@ class ExpensesManager {
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="guideCategory" class="form-label">الفئة الرئيسية</label>
-                            <select class="form-control neumorphic-input" id="guideCategory" required>
-                                <option value="">اختر الفئة</option>
-                                <option value="مواد البناء">مواد البناء</option>
-                                <option value="العمالة">العمالة</option>
-                                <option value="المعدات والآلات">المعدات والآلات</option>
-                                <option value="النقل والمواصلات">النقل والمواصلات</option>
-                                <option value="الوقود والطاقة">الوقود والطاقة</option>
-                                <option value="الصيانة والإصلاح">الصيانة والإصلاح</option>
-                                <option value="الرواتب والأجور">الرواتب والأجور</option>
-                                <option value="التأمين">التأمين</option>
-                                <option value="الضرائب والرسوم">الضرائب والرسوم</option>
-                                <option value="المكتب والإدارة">المكتب والإدارة</option>
-                                <option value="التسويق والإعلان">التسويق والإعلان</option>
-                                <option value="الاستشارات المهنية">الاستشارات المهنية</option>
-                                <option value="أخرى">أخرى</option>
-                            </select>
+                            <div class="input-group">
+                                <select class="form-control neumorphic-input" id="guideCategory" required>
+                                    <option value="">اختر الفئة</option>
+                                    ${categories.map(c=>`<option value="${c}">${c}</option>`).join('')}
+                                </select>
+                                <button class="btn btn-outline-success" type="button" id="btnShowAddMainCat" title="إضافة فئة رئيسية"><i class="bi bi-plus-circle"></i></button>
+                            </div>
+                            <div id="addMainCategoryRow" class="mt-2" style="display:none">
+                                <div class="input-group">
+                                    <input type="text" id="newMainCategoryName" class="form-control" placeholder="اسم فئة رئيسية جديدة">
+                                    <button class="btn btn-success" type="button" id="btnAddMainCategory"><i class="bi bi-check2"></i> إضافة</button>
+                                    <button class="btn btn-secondary" type="button" id="btnCancelAddMainCat"><i class="bi bi-x"></i></button>
+                                </div>
+                                <small class="text-muted">أضف فئة رئيسية جديدة للدليل المحاسبي، ستظهر في القائمة فوراً.</small>
+                            </div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="guideType" class="form-label">نوع الحساب</label>
@@ -3152,6 +3152,30 @@ class ExpensesManager {
                 </div>
             </div>
         `;
+    }
+
+    // Helper: get main categories for accounting guide (from storage)
+    getGuideMainCategories(){
+        const list = StorageManager.getData(StorageManager.STORAGE_KEYS.ACCOUNTING_GUIDE_CATEGORIES) || [];
+        // ensure it's an array of strings
+        return Array.isArray(list) ? list.filter(x=>typeof x==='string' && x.trim().length>0) : [];
+    }
+
+    // Helper: add a new main category and persist
+    addGuideMainCategory(name){
+        const val = (name||'').trim();
+        if(!val){ this.showNotification('يرجى إدخال اسم فئة صالح','warning'); return false; }
+        let list = StorageManager.getData(StorageManager.STORAGE_KEYS.ACCOUNTING_GUIDE_CATEGORIES) || [];
+        if(!Array.isArray(list)) list = [];
+        // prevent duplicates (case-insensitive Arabic safe by trimming)
+        if(list.some(c => (c||'').trim() === val)){
+            this.showNotification('هذه الفئة موجودة بالفعل','info');
+            return false;
+        }
+        list.push(val);
+        const ok = StorageManager.saveData(StorageManager.STORAGE_KEYS.ACCOUNTING_GUIDE_CATEGORIES, list);
+        if(ok){ this.showNotification('تمت إضافة الفئة الرئيسية بنجاح','success'); }
+        return ok;
     }
 
     // Render edit guide list
@@ -3923,6 +3947,29 @@ class ExpensesManager {
             e.preventDefault();
             this.saveGuideItem();
         });
+
+        // Wire add-main-category UI
+        const toggleBtn = document.getElementById('btnShowAddMainCat');
+        const row = document.getElementById('addMainCategoryRow');
+        const addBtn = document.getElementById('btnAddMainCategory');
+        const cancelBtn = document.getElementById('btnCancelAddMainCat');
+        const input = document.getElementById('newMainCategoryName');
+        const sel = document.getElementById('guideCategory');
+        if(toggleBtn && row){ toggleBtn.onclick = ()=>{ row.style.display = row.style.display==='none' ? 'block' : 'none'; if(row.style.display==='block'){ input?.focus(); } }; }
+        if(cancelBtn && row){ cancelBtn.onclick = ()=>{ row.style.display='none'; if(input) input.value=''; }; }
+        if(addBtn && input && sel){
+            addBtn.onclick = ()=>{
+                const name = input.value;
+                if(this.addGuideMainCategory(name)){
+                    // refresh select options quickly
+                    const cats = this.getGuideMainCategories();
+                    sel.innerHTML = '<option value="">اختر الفئة</option>' + cats.map(c=>`<option value="${c}">${c}</option>`).join('');
+                    sel.value = name;
+                    input.value = '';
+                    row.style.display = 'none';
+                }
+            };
+        }
     }
 
     // Save guide item
