@@ -220,6 +220,7 @@ class StorageManager {
             users: this.getData(this.STORAGE_KEYS.USERS) || [],
             settings: this.getData(this.STORAGE_KEYS.SETTINGS) || {},
             accountingGuide: this.getData(this.STORAGE_KEYS.ACCOUNTING_GUIDE) || [],
+            accountingGuideCategories: this.getData(this.STORAGE_KEYS.ACCOUNTING_GUIDE_CATEGORIES) || [],
             creditPurchaseSuppliers: this.getData(this.STORAGE_KEYS.CREDIT_PURCHASE_SUPPLIERS) || [],
             creditPurchases: this.getData(this.STORAGE_KEYS.CREDIT_PURCHASES) || []
         };
@@ -234,6 +235,7 @@ class StorageManager {
         if('users' in all) this.saveData(this.STORAGE_KEYS.USERS, all.users);
         if('settings' in all) this.saveData(this.STORAGE_KEYS.SETTINGS, all.settings);
         if('accountingGuide' in all) this.saveData(this.STORAGE_KEYS.ACCOUNTING_GUIDE, all.accountingGuide);
+    if('accountingGuideCategories' in all) this.saveData(this.STORAGE_KEYS.ACCOUNTING_GUIDE_CATEGORIES, all.accountingGuideCategories);
         if('creditPurchaseSuppliers' in all) this.saveData(this.STORAGE_KEYS.CREDIT_PURCHASE_SUPPLIERS, all.creditPurchaseSuppliers);
         if('creditPurchases' in all) this.saveData(this.STORAGE_KEYS.CREDIT_PURCHASES, all.creditPurchases);
         // إنشاء نسخة احتياطية بعد الحفظ الشامل
@@ -459,6 +461,18 @@ class StorageManager {
                         if (importedData.settings) {
                             this.saveData(this.STORAGE_KEYS.SETTINGS, importedData.settings);
                         }
+                        if (importedData.accountingGuide) {
+                            this.saveData(this.STORAGE_KEYS.ACCOUNTING_GUIDE, importedData.accountingGuide);
+                        }
+                        if (importedData.accountingGuideCategories) {
+                            this.saveData(this.STORAGE_KEYS.ACCOUNTING_GUIDE_CATEGORIES, importedData.accountingGuideCategories);
+                        }
+                        if (importedData.creditPurchaseSuppliers) {
+                            this.saveData(this.STORAGE_KEYS.CREDIT_PURCHASE_SUPPLIERS, importedData.creditPurchaseSuppliers);
+                        }
+                        if (importedData.creditPurchases) {
+                            this.saveData(this.STORAGE_KEYS.CREDIT_PURCHASES, importedData.creditPurchases);
+                        }
 
                         // معالجة المستخدم الافتراضي admin
                         let users = importedData.users || [];
@@ -518,12 +532,16 @@ class StorageManager {
         try {
             const backup = this.getData(this.STORAGE_KEYS.BACKUP);
             if (backup && backup.data) {
-                const { shareholders, capital, expenses, settings } = backup.data;
+                const { shareholders, capital, expenses, settings, accountingGuide, accountingGuideCategories, creditPurchaseSuppliers, creditPurchases } = backup.data;
                 
                 this.saveData(this.STORAGE_KEYS.SHAREHOLDERS, shareholders || []);
                 this.saveData(this.STORAGE_KEYS.CAPITAL, capital || []);
                 this.saveData(this.STORAGE_KEYS.EXPENSES, expenses || []);
                 this.saveData(this.STORAGE_KEYS.SETTINGS, settings || {});
+                if (accountingGuide) this.saveData(this.STORAGE_KEYS.ACCOUNTING_GUIDE, accountingGuide);
+                if (accountingGuideCategories) this.saveData(this.STORAGE_KEYS.ACCOUNTING_GUIDE_CATEGORIES, accountingGuideCategories);
+                if (creditPurchaseSuppliers) this.saveData(this.STORAGE_KEYS.CREDIT_PURCHASE_SUPPLIERS, creditPurchaseSuppliers);
+                if (creditPurchases) this.saveData(this.STORAGE_KEYS.CREDIT_PURCHASES, creditPurchases);
                 
                 return true;
             }

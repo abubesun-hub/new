@@ -2858,6 +2858,11 @@ class ExpensesManager {
                                     <i class="bi bi-printer me-2"></i>طباعة الدليل
                                 </button>
                             </div>
+                            <div class="col-md-4 mb-3">
+                                <button class="btn btn-secondary neumorphic-btn w-100" onclick="expensesManager.showGuideSubView('manage-cats')">
+                                    <i class="bi bi-sliders me-2"></i>إدارة الفئات الرئيسية
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2900,6 +2905,9 @@ class ExpensesManager {
                 break;
             case 'edit':
                 guideContent.innerHTML = this.renderEditGuideList();
+                break;
+            case 'manage-cats':
+                guideContent.innerHTML = this.renderManageGuideCategories();
                 break;
             case 'print':
                 this.printAccountingGuide();
@@ -3176,6 +3184,156 @@ class ExpensesManager {
         const ok = StorageManager.saveData(StorageManager.STORAGE_KEYS.ACCOUNTING_GUIDE_CATEGORIES, list);
         if(ok){ this.showNotification('تمت إضافة الفئة الرئيسية بنجاح','success'); }
         return ok;
+    }
+
+    // Helper: delete a main category (prevent if used)
+    deleteGuideMainCategory(name){
+        const val = (name||'').trim();
+        if(!val) return false;
+        const guide = StorageManager.getData(StorageManager.STORAGE_KEYS.ACCOUNTING_GUIDE) || [];
+        const usedCount = guide.filter(it => (it.category||'').trim() === val).length;
+        if (usedCount > 0){
+            this.showNotification(`لا يمكن حذف الفئة "${val}" لوجود ${usedCount} عنصر(عناصر) مرتبطة بها. قم بإعادة تصنيف العناصر أولاً.`, 'warning');
+            return false;
+        }
+        let list = this.getGuideMainCategories();
+        const idx = list.findIndex(c => (c||'').trim() === val);
+        if (idx === -1) return false;
+        list.splice(idx,1);
+        const ok = StorageManager.saveData(StorageManager.STORAGE_KEYS.ACCOUNTING_GUIDE_CATEGORIES, list);
+        if (ok){
+            this.showNotification('تم حذف الفئة بنجاح','success');
+            this.refreshManageCategoriesUI();
+        }
+        return ok;
+    }
+
+    // Helper: rename a main category and update guide items
+    renameGuideMainCategory(oldName, newName){
+        const from = (oldName||'').trim();
+        const to = (newName||'').trim();
+        if(!from || !to){ this.showNotification('يرجى إدخال اسم جديد صالح','warning'); return false; }
+        if (from === to){ this.showNotification('لا يوجد تغيير في الاسم','info'); return false; }
+        let list = this.getGuideMainCategories();
+        if (list.some(c => (c||'').trim() === to)){
+            this.showNotification('اسم الفئة الجديد موجود مسبقاً','warning');
+            return false;
+        }
+        const idx = list.findIndex(c => (c||'').trim() === from);
+        if (idx === -1){ return false; }
+        list[idx] = to;
+        const okList = StorageManager.saveData(StorageManager.STORAGE_KEYS.ACCOUNTING_GUIDE_CATEGORIES, list);
+        // Update existing guide items
+        let guide = StorageManager.getData(StorageManager.STORAGE_KEYS.ACCOUNTING_GUIDE) || [];
+        let changed = 0;
+        guide = guide.map(it => {
+            if ((it.category||'').trim() === from){ changed++; return { ...it, category: to, updatedAt: new Date().toISOString() }; }
+            return it;
+        });
+        const okGuide = StorageManager.saveData(StorageManager.STORAGE_KEYS.ACCOUNTING_GUIDE, guide);
+        if (okList && okGuide){
+            this.showNotification(`تمت إعادة تسمية الفئة وتحديث ${changed} عنصرًا في الدليل`, 'success');
+            this.refreshManageCategoriesUI();
+            return true;
+        }
+        this.showNotification('تعذر حفظ التغييرات','error');
+        return false;
+    }
+
+    // Helper: move category up/down for ordering in UI
+    moveGuideMainCategory(name, dir){
+        const val = (name||'').trim();
+        let list = this.getGuideMainCategories();
+        const idx = list.findIndex(c => (c||'').trim() === val);
+        if (idx === -1) return false;
+        if (dir === 'up' && idx > 0){
+            [list[idx-1], list[idx]] = [list[idx], list[idx-1]];
+        } else if (dir === 'down' && idx < list.length - 1){
+            [list[idx+1], list[idx]] = [list[idx], list[idx+1]];
+        } else {
+            return false;
+        }
+        const ok = StorageManager.saveData(StorageManager.STORAGE_KEYS.ACCOUNTING_GUIDE_CATEGORIES, list);
+        if (ok){ this.refreshManageCategoriesUI(); }
+        return ok;
+    }
+
+    // Refresh the manage categories view
+    refreshManageCategoriesUI(){
+        this.showGuideSubView('manage-cats');
+    }
+
+    // Render Manage Categories UI
+    renderManageGuideCategories(){
+        const cats = this.getGuideMainCategories();
+        const guide = StorageManager.getData(StorageManager.STORAGE_KEYS.ACCOUNTING_GUIDE) || [];
+        const rows = cats.map((c, i) => {
+            const usage = guide.filter(it => (it.category||'').trim() === c).length;
+            const upDisabled = i === 0 ? 'disabled' : '';
+            const downDisabled = i === cats.length - 1 ? 'disabled' : '';
+            const delDisabled = usage > 0 ? 'disabled' : '';
+            return `
+                <tr>
+                    <td><span class="badge bg-light text-dark">${i+1}</span></td>
+                    <td>${c}</td>
+                    <td><span class="badge ${usage>0?'bg-warning text-dark':'bg-success'}">${usage}</span></td>
+                    <td class="text-nowrap">
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-secondary" ${upDisabled} title="أعلى" onclick="expensesManager.moveGuideMainCategory('${c.replace(/'/g,"&#39;")}','up')"><i class="bi bi-arrow-up"></i></button>
+                            <button class="btn btn-outline-secondary" ${downDisabled} title="أسفل" onclick="expensesManager.moveGuideMainCategory('${c.replace(/'/g,"&#39;")}','down')"><i class="bi bi-arrow-down"></i></button>
+                            <button class="btn btn-outline-primary" title="إعادة تسمية" onclick="expensesManager._promptRenameCat('${c.replace(/'/g,"&#39;")}')"><i class="bi bi-pencil"></i></button>
+                            <button class="btn btn-outline-danger" ${delDisabled} title="حذف" onclick="expensesManager.deleteGuideMainCategory('${c.replace(/'/g,"&#39;")}')"><i class="bi bi-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>`;
+        }).join('');
+
+        return `
+            <div class="neumorphic-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-sliders me-2"></i>إدارة الفئات الرئيسية للدليل</h5>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="expensesManager.showGuideSubView('overview')"><i class="bi bi-arrow-right"></i> عودة</button>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2 align-items-end mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">إضافة فئة رئيسية جديدة</label>
+                            <input type="text" id="mgcNewName" class="form-control neumorphic-input" placeholder="اسم الفئة">
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-primary w-100" onclick="(function(){ const v=document.getElementById('mgcNewName').value; if(expensesManager.addGuideMainCategory(v)){ document.getElementById('mgcNewName').value=''; expensesManager.refreshManageCategoriesUI(); } })()"><i class="bi bi-plus-lg me-1"></i>إضافة</button>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-outline-success w-100" onclick="expensesManager.showGuideSubView('add')"><i class="bi bi-plus-circle me-1"></i>إضافة عنصر دليل</button>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead>
+                                <tr>
+                                    <th style="width:60px">#</th>
+                                    <th>الفئة</th>
+                                    <th style="width:120px">عدد العناصر</th>
+                                    <th style="width:220px">إجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rows || '<tr><td colspan="4" class="text-center text-muted">لا توجد فئات بعد</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
+                    <small class="text-muted">ملاحظة: لا يمكن حذف فئة مستخدمة في عناصر الدليل. قم بإعادة تصنيف العناصر ثم احذف الفئة.</small>
+                </div>
+            </div>
+        `;
+    }
+
+    // Prompt helper for renaming (inline, minimal UI)
+    _promptRenameCat(oldName){
+        const newName = prompt(`إعادة تسمية الفئة: ${oldName}`, oldName);
+        if (newName !== null){
+            this.renameGuideMainCategory(oldName, newName);
+        }
     }
 
     // Render edit guide list
