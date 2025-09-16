@@ -3442,22 +3442,13 @@ class ExpensesManager {
 
     // Get expense categories
     getExpenseCategories() {
-        return [
-            'مواد البناء',
-            'العمالة',
-            'المعدات والآلات',
-            'النقل والمواصلات',
-            'الوقود والطاقة',
-            'الصيانة والإصلاح',
-            'الرواتب والأجور',
-            'التأمين',
-            'الضرائب والرسوم',
-            'المكتب والإدارة',
-            'التسويق والإعلان',
-            'الاستشارات المهنية',
-            'أخرى',
-            'تسديد مشتريات آجل'
-        ];
+        // Source categories from the same storage used by accounting guide main categories
+        let cats = StorageManager.getData(StorageManager.STORAGE_KEYS.ACCOUNTING_GUIDE_CATEGORIES) || [];
+        if (!Array.isArray(cats)) cats = [];
+        // Optional: ensure special operational category exists at the end if your flows rely on it
+        const special = 'تسديد مشتريات آجل';
+        if (!cats.includes(special)) cats = cats.concat([special]);
+        return cats;
     }
 
     // Render recent expenses
@@ -3526,6 +3517,29 @@ class ExpensesManager {
             e.preventDefault();
             this.saveExpenseEntry();
         });
+
+        // Auto-select category when accounting guide changes
+        const accountingGuideSelect = document.getElementById('expenseAccountingGuide');
+        const categorySelect = document.getElementById('expenseCategory');
+        if (accountingGuideSelect && categorySelect){
+            accountingGuideSelect.addEventListener('change', () => {
+                const guideId = accountingGuideSelect.value;
+                if (!guideId) return;
+                const guide = StorageManager.getData(StorageManager.STORAGE_KEYS.ACCOUNTING_GUIDE) || [];
+                const item = guide.find(g => g.id === guideId);
+                const category = item?.category || '';
+                if (!category) return;
+                // ensure option exists in the category select; if not, append it
+                let opt = Array.from(categorySelect.options).find(o => o.value === category);
+                if (!opt){
+                    const newOpt = document.createElement('option');
+                    newOpt.value = category;
+                    newOpt.textContent = category;
+                    categorySelect.appendChild(newOpt);
+                }
+                categorySelect.value = category;
+            });
+        }
     }
     
     saveExpenseEntry() {
