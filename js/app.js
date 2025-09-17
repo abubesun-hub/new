@@ -1629,7 +1629,7 @@ class AccountingApp {
         const agg = new Map();
         for (const e of capital) {
             const name = shMap.get(e.shareholderId) || 'غير محدد';
-            if (criteria?.name && !name.toLowerCase().includes(criteria.name)) continue;
+            if (criteria?.name && name !== criteria.name) continue;
             const key = e.shareholderId || name;
             if (!agg.has(key)) agg.set(key, {
                 shareholderId: e.shareholderId || null,
@@ -1665,6 +1665,8 @@ class AccountingApp {
         })).sort((a,b) => a.name.localeCompare(b.name, 'ar'));
 
         this.renderGeneralCapitalReportTable(rows);
+        // Ensure dropdown stays in sync in case shareholders list changed
+        this.populateGeneralCapitalShareholderSelect?.();
         this.updateGeneralCapitalReportSummary(rows);
     }
 
