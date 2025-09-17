@@ -499,8 +499,9 @@ class AccountingApp {
                         <div class="row">
                             <div class="col-md-4 mb-3">
                                 <label for="searchShareholder" class="form-label">البحث عن مساهم</label>
-                                <input type="text" class="form-control neumorphic-input" id="searchShareholder"
-                                       placeholder="اكتب اسم المساهم...">
+                                <select class="form-select neumorphic-input" id="searchShareholder">
+                                    <option value="">كل المساهمين</option>
+                                </select>
                             </div>
                             <div class="col-md-3 mb-3">
                                 <label for="searchDateFrom" class="form-label">من تاريخ</label>
@@ -764,13 +765,23 @@ class AccountingApp {
         const searchDateTo = document.getElementById('searchDateTo');
         const searchCurrency = document.getElementById('searchCurrency');
 
+        // If shareholder filter is a select, populate with shareholders list
+        if (searchShareholder && searchShareholder.tagName === 'SELECT') {
+            const shareholders = StorageManager.getData(StorageManager.STORAGE_KEYS.SHAREHOLDERS) || [];
+            [...searchShareholder.options].slice(1).forEach(o=>o.remove());
+            shareholders.sort((a,b)=> a.name.localeCompare(b.name,'ar')).forEach(sh => {
+                const opt = document.createElement('option');
+                opt.value = sh.name;
+                opt.textContent = sh.name;
+                searchShareholder.appendChild(opt);
+            });
+        }
+
         // Add event listeners for real-time search
         [searchShareholder, searchDateFrom, searchDateTo, searchCurrency].forEach(element => {
-            if (element) {
-                element.addEventListener('input', () => {
-                    this.searchCapitalReport();
-                });
-            }
+            if (!element) return;
+            const evt = (element.tagName === 'SELECT') ? 'change' : 'input';
+            element.addEventListener(evt, () => this.searchCapitalReport());
         });
     }
 
@@ -1440,6 +1451,7 @@ class AccountingApp {
                 // default load
                 this.loadGeneralCapitalReportData();
                 this.setupGeneralCapitalReportSearch();
+                this.populateGeneralCapitalShareholderSelect();
             }
         }, 100);
     }
@@ -1469,7 +1481,9 @@ class AccountingApp {
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label">اسم المساهم</label>
-                                <input type="text" id="gcapName" class="form-control neumorphic-input" placeholder="فلترة باسم المساهم (اختياري)">
+                                <select id="gcapName" class="form-select neumorphic-input">
+                                    <option value="">كل المساهمين</option>
+                                </select>
                             </div>
                             <div class="col-md-3 d-flex gap-2">
                                 <button class="btn btn-primary neumorphic-btn flex-grow-1" onclick="app.searchGeneralCapitalReport()">
@@ -1563,6 +1577,22 @@ class AccountingApp {
         this.loadGeneralCapitalReportData();
     }
 
+    populateGeneralCapitalShareholderSelect() {
+        const sel = document.getElementById('gcapName');
+        if (!sel) return;
+        const shareholders = StorageManager.getData(StorageManager.STORAGE_KEYS.SHAREHOLDERS) || [];
+        const current = sel.value;
+        // Remove dynamically added options
+        [...sel.options].slice(1).forEach(o=>o.remove());
+        shareholders.sort((a,b)=> a.name.localeCompare(b.name,'ar')).forEach(sh => {
+            const opt = document.createElement('option');
+            opt.value = sh.name;
+            opt.textContent = sh.name;
+            sel.appendChild(opt);
+        });
+        if (current && [...sel.options].some(o=>o.value===current)) sel.value = current; else sel.value='';
+    }
+
     searchGeneralCapitalReport() {
         this.loadGeneralCapitalReportData(this.getGeneralCapitalCriteria());
     }
@@ -1571,7 +1601,7 @@ class AccountingApp {
         return {
             from: document.getElementById('gcapFrom')?.value || '',
             to: document.getElementById('gcapTo')?.value || '',
-            name: (document.getElementById('gcapName')?.value || '').trim().toLowerCase()
+            name: (document.getElementById('gcapName')?.value || '').trim() // exact match from select
         };
     }
 
