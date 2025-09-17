@@ -1645,18 +1645,37 @@ class AccountingApp {
             return;
         }
 
-        const body = rows.map((r,i)=>`
+        // Need shareholders list to fetch declared ownership percentages
+        const shareholders = StorageManager.getData(StorageManager.STORAGE_KEYS.SHAREHOLDERS) || [];
+        // Compute total combined (positive net) capital in IQD for actual percentage
+        const settings = StorageManager.getData(StorageManager.STORAGE_KEYS.SETTINGS) || {};
+        const usdToIqd = parseFloat(settings.usdToIqd) || 1460;
+        const totalCombinedIQD = rows.reduce((sum,r)=>{
+            const combined = (r.balIQD) + (r.balUSD * usdToIqd);
+            return sum + Math.max(0, combined);
+        },0);
+
+        const body = rows.map((r,i)=>{
+            const shareholder = shareholders.find(s=> s.name === r.name); // name-based match (IDs not kept in rows)
+            const declared = shareholder && shareholder.ownershipPercent != null ? parseFloat(shareholder.ownershipPercent) : null;
+            const actualPercent = totalCombinedIQD>0 ? (((r.balIQD + (r.balUSD*usdToIqd)) / totalCombinedIQD) * 100) : 0;
+            const diff = declared != null ? (actualPercent - declared) : null;
+            const diffBadgeClass = diff == null ? 'bg-secondary' : Math.abs(diff) < 1 ? 'bg-success' : (diff > 0 ? 'bg-info' : 'bg-warning text-dark');
+            return `
             <tr>
                 <td>${i+1}</td>
                 <td>${r.name}</td>
+                <td>${declared != null ? declared.toFixed(2)+'%' : '<span class="text-muted">—</span>'}</td>
+                <td title="محسوبة وفق معدل ${usdToIqd} د.ع لكل دولار">${actualPercent.toFixed(2)}%</td>
+                <td>${diff != null ? `<span class="badge ${diffBadgeClass}">${diff.toFixed(2)}</span>` : '<span class="text-muted">—</span>'}</td>
                 <td class="text-success">${this.formatCurrency(r.depIQD,'IQD')}</td>
                 <td class="text-danger">${this.formatCurrency(r.withIQD,'IQD')}</td>
                 <td class="text-primary fw-bold">${this.formatCurrency(r.balIQD,'IQD')}</td>
                 <td class="text-success">${this.formatCurrency(r.depUSD,'USD')}</td>
                 <td class="text-danger">${this.formatCurrency(r.withUSD,'USD')}</td>
                 <td class="text-primary fw-bold">${this.formatCurrency(r.balUSD,'USD')}</td>
-            </tr>
-        `).join('');
+            </tr>`;
+        }).join('');
 
         // Totals
         const totals = rows.reduce((a,r)=>{
@@ -1664,12 +1683,17 @@ class AccountingApp {
             a.depIQD += r.depIQD; a.withIQD += r.withIQD; a.balIQD += r.balIQD; return a;
         }, {depUSD:0,withUSD:0,balUSD:0,depIQD:0,withIQD:0,balIQD:0});
 
+        const declaredSum = shareholders.reduce((s,sh)=> sh.ownershipPercent!=null ? s + parseFloat(sh.ownershipPercent) : s,0);
+        const declaredAlert = declaredSum>0 ? `<div class="small mt-1 ${(Math.abs(declaredSum-100)<=0.5)?'text-success':'text-warning'}">مجموع النسب المعلنة: ${declaredSum.toFixed(2)}%</div>` : '';
         wrap.innerHTML = `
             <table class="table table-sm table-striped align-middle">
                 <thead class="table-dark">
                     <tr>
                         <th>#</th>
                         <th>اسم المساهم</th>
+                        <th>النسبة المعلنة %</th>
+                        <th>النسبة الفعلية %</th>
+                        <th>الفرق (نقاط)</th>
                         <th>المبلغ المودع د.ع</th>
                         <th>المبلغ المسحوب د.ع</th>
                         <th>رصيده د.ع</th>
@@ -1681,7 +1705,7 @@ class AccountingApp {
                 <tbody>${body}</tbody>
                 <tfoot class="table-light">
                     <tr class="fw-bold">
-                        <td colspan="2" class="text-center">الإجمالي</td>
+                        <td colspan="5" class="text-center">الإجمالي</td>
                         <td>${this.formatCurrency(totals.depIQD,'IQD')}</td>
                         <td>${this.formatCurrency(totals.withIQD,'IQD')}</td>
                         <td>${this.formatCurrency(totals.balIQD,'IQD')}</td>
@@ -1690,7 +1714,8 @@ class AccountingApp {
                         <td>${this.formatCurrency(totals.balUSD,'USD')}</td>
                     </tr>
                 </tfoot>
-            </table>`;
+            </table>
+            ${declaredAlert}`;
         const cnt = document.getElementById('gcapCount'); if (cnt) cnt.textContent = `${rows.length} مساهم`;
     }
 

@@ -218,6 +218,14 @@ class CapitalManager {
                             <label for="shareholderCivilId" class="form-label">رقم الهوية المدنية</label>
                             <input type="text" class="form-control neumorphic-input" id="shareholderCivilId" required>
                         </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="shareholderSharePercent" class="form-label">نسبة أسهم المساهم (%)</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control neumorphic-input" id="shareholderSharePercent" step="0.01" min="0" max="100" placeholder="مثال: 25" aria-describedby="sharePercentHelp">
+                                <span class="input-group-text">%</span>
+                            </div>
+                            <small id="sharePercentHelp" class="text-muted">إدخل النسبة المئوية لحصة هذا المساهم من إجمالي رأس المال (اختياري حالياً، ستستخدم لاحقاً في توزيع الأرباح/الخسائر).</small>
+                        </div>
                         <div class="col-12 mb-3">
                             <label for="shareholderAddress" class="form-label">العنوان</label>
                             <textarea class="form-control neumorphic-input" id="shareholderAddress" rows="3"></textarea>
@@ -578,6 +586,10 @@ class CapitalManager {
             return sum + Math.max(0, combined);
         }, 0);
 
+        // Sum of declared percentages (ignore nulls)
+        const declaredTotal = shareholderContributions.reduce((sum, s) => sum + (s.ownershipPercent ? parseFloat(s.ownershipPercent) : 0), 0);
+        const declaredWarning = declaredTotal > 0 && Math.abs(declaredTotal - 100) > 0.5; // tolerance 0.5%
+
         return `
             <div class="table-responsive">
                 <table class="table table-hover">
@@ -587,27 +599,34 @@ class CapitalManager {
                             <th>المنصب</th>
                             <th>المساهمة بالدولار</th>
                             <th>المساهمة بالدينار</th>
-                            <th>النسبة %</th>
+                            <th>النسبة الفعلية %</th>
+                            <th>النسبة المعلنة %</th>
+                            <th>الفرق (نقاط)</th>
                             <th>عدد الإدخالات</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${shareholderContributions.map(shareholder => {
-                            // calculate combined value in IQD for percent
                             const shareCombinedIQD = (parseFloat(shareholder.totalIQD) || 0) + ((parseFloat(shareholder.totalUSD) || 0) * usdToIqd);
-                            const percent = totalCombinedIQD > 0 ? ((shareCombinedIQD / totalCombinedIQD) * 100).toFixed(1) : '0.0';
+                            const actualPercent = totalCombinedIQD > 0 ? ((shareCombinedIQD / totalCombinedIQD) * 100) : 0;
+                            const declared = shareholder.ownershipPercent != null ? parseFloat(shareholder.ownershipPercent) : null;
+                            const diff = declared != null ? (actualPercent - declared) : null;
+                            const diffBadgeClass = diff == null ? 'bg-secondary' : Math.abs(diff) < 1 ? 'bg-success' : (diff > 0 ? 'bg-info' : 'bg-warning text-dark');
                             return `
                             <tr>
                                 <td>${shareholder.name}</td>
                                 <td>${shareholder.position}</td>
                                 <td>${this.formatCurrency(shareholder.totalUSD, 'USD')}</td>
                                 <td>${this.formatCurrency(shareholder.totalIQD, 'IQD')}</td>
-                                <td title="مبني على معدل تحويل ${usdToIqd} د.ع لكل دولار">${percent}%</td>
+                                <td title="مبني على معدل تحويل ${usdToIqd} د.ع لكل دولار">${actualPercent.toFixed(2)}%</td>
+                                <td>${declared != null ? declared.toFixed(2) + '%' : '<span class="text-muted">—</span>'}</td>
+                                <td>${diff != null ? `<span class="badge ${diffBadgeClass}">${diff.toFixed(2)}</span>` : '<span class="text-muted">—</span>'}</td>
                                 <td><span class="badge bg-info">${shareholder.contributionsCount}</span></td>
-                            </tr>
-                        `}).join('')}
+                            </tr>`;
+                        }).join('')}
                     </tbody>
                 </table>
+                ${declaredWarning ? `<div class="alert alert-warning mt-2">مجموع النسب المعلنة = ${declaredTotal.toFixed(2)}% (يجب أن يساوي 100%).</div>` : ''}
             </div>
         `;
     }
@@ -629,6 +648,7 @@ class CapitalManager {
                             <th>المنصب</th>
                             <th>الهاتف</th>
                             <th>رقم الهوية</th>
+                            <th>النسبة المعلنة %</th>
                             <th>الإجراءات</th>
                         </tr>
                     </thead>
@@ -639,6 +659,7 @@ class CapitalManager {
                                 <td>${shareholder.position}</td>
                                 <td>${shareholder.phone}</td>
                                 <td>${shareholder.civilId}</td>
+                                <td>${shareholder.ownershipPercent != null ? shareholder.ownershipPercent.toFixed(2) + '%' : '<span class="text-muted">—</span>'}</td>
                                 <td>
                                     <div class="btn-group btn-group-sm">
                                         <button class="btn btn-outline-primary" onclick="capitalManager.editShareholder('${shareholder.id}')">
@@ -737,7 +758,7 @@ class CapitalManager {
                     <div class="list-group-item d-flex justify-content-between align-items-center">
                         <div>
                             <h6 class="mb-1">${shareholder.name}</h6>
-                            <small class="text-muted">${shareholder.position}</small>
+                            <small class="text-muted">${shareholder.position}${shareholder.ownershipPercent != null ? ' • ' + shareholder.ownershipPercent.toFixed(2) + '%' : ''}</small>
                         </div>
                         <button class="btn btn-outline-primary btn-sm" onclick="capitalManager.editShareholder('${shareholder.id}')">
                             <i class="bi bi-pencil me-1"></i>تعديل
@@ -888,11 +909,22 @@ class CapitalManager {
 
     // Save shareholder
     saveShareholder() {
+        const rawPercent = (document.getElementById('shareholderSharePercent')?.value || '').trim();
+        let ownershipPercent = rawPercent === '' ? null : parseFloat(rawPercent);
+        if (ownershipPercent !== null) {
+            if (isNaN(ownershipPercent) || ownershipPercent < 0 || ownershipPercent > 100) {
+                this.showNotification('الرجاء إدخال نسبة أسهم صحيحة بين 0 و 100', 'error');
+                return;
+            }
+            ownershipPercent = parseFloat(ownershipPercent.toFixed(2));
+        }
+
         const shareholderData = {
             name: document.getElementById('shareholderName').value,
             position: document.getElementById('shareholderPosition').value,
             phone: document.getElementById('shareholderPhone').value,
             civilId: document.getElementById('shareholderCivilId').value,
+            ownershipPercent, // may be null
             address: document.getElementById('shareholderAddress').value
         };
 
@@ -1024,6 +1056,9 @@ class CapitalManager {
             document.getElementById('shareholderPhone').value = shareholder.phone;
             document.getElementById('shareholderCivilId').value = shareholder.civilId;
             document.getElementById('shareholderAddress').value = shareholder.address || '';
+            if (document.getElementById('shareholderSharePercent')) {
+                document.getElementById('shareholderSharePercent').value = shareholder.ownershipPercent != null ? shareholder.ownershipPercent : '';
+            }
 
             this.editingId = id;
             this.showNotification('جاري تعديل المساهم', 'info');

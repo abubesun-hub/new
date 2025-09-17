@@ -130,7 +130,7 @@ class ReportsManager {
             contributionTrends: this.getCapitalTrends(data)
         };
 
-        if (data.capital && data.shareholders) {
+    if (data.capital && data.shareholders) {
             // Calculate shareholder contributions
             const shareholderMap = new Map();
             
@@ -144,6 +144,7 @@ class ReportsManager {
                     const shareholder = data.shareholders.find(s => s.id === shareholderId);
                     shareholderMap.set(shareholderId, {
                         name: shareholder ? shareholder.name : 'غير محدد',
+                        ownershipPercent: shareholder && shareholder.ownershipPercent != null ? shareholder.ownershipPercent : null,
                         USD: 0,
                         IQD: 0,
                         entries: 0
@@ -462,6 +463,55 @@ class ReportsManager {
         // Route based on report type
         if (report.type === 'expenses') {
             return this.generateExpensesReportContent(report);
+        }
+
+        // Capital report custom table (grouped by shareholder) including declared ownership percent
+        if (report.title === 'تقرير رأس المال' && report.data && Array.isArray(report.data.shareholderContributions)) {
+            const rows = report.data.shareholderContributions.map((c,idx)=>{
+                return `<tr>
+                    <td>${idx+1}</td>
+                    <td>${c.name}</td>
+                    <td>${c.ownershipPercent != null ? c.ownershipPercent.toFixed(2)+'%' : '-'}</td>
+                    <td>${this.formatCurrency(c.USD,'USD')}</td>
+                    <td>${this.formatCurrency(c.IQD,'IQD')}</td>
+                    <td>${c.entries}</td>
+                </tr>`;
+            }).join('');
+            const totUSD = this.formatCurrency(report.data.totalUSD,'USD');
+            const totIQD = this.formatCurrency(report.data.totalIQD,'IQD');
+            const declaredSum = report.data.shareholderContributions
+                .filter(c=>c.ownershipPercent!=null)
+                .reduce((s,c)=> s + (parseFloat(c.ownershipPercent)||0),0);
+            const declaredNote = declaredSum>0 ? `<div class="mt-2 small ${(Math.abs(declaredSum-100)<=0.5)?'text-success':'text-warning'}">مجموع النسب المعلنة: ${declaredSum.toFixed(2)}%</div>` : '';
+            return `
+                <div class="report-header mb-4">
+                    <h3>${report.title}</h3>
+                    <p class="text-muted">تم إنشاؤه في: ${this.formatDate(report.generatedAt)}</p>
+                </div>
+                <div class="table-responsive mb-3">
+                    <table class="table table-bordered table-sm align-middle text-center">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>اسم المساهم</th>
+                                <th>النسبة المعلنة %</th>
+                                <th>الإجمالي بالدولار</th>
+                                <th>الإجمالي بالدينار</th>
+                                <th>عدد الحركات</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}
+                            <tr class="table-secondary fw-bold">
+                                <td colspan="3">الإجمالي</td>
+                                <td>${totUSD}</td>
+                                <td>${totIQD}</td>
+                                <td>${report.data.shareholderContributions.reduce((s,c)=> s + c.entries,0)}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    ${declaredNote}
+                </div>
+            `;
         }
 
         // Generic fallback content
