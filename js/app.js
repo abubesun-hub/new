@@ -1448,16 +1448,8 @@ class AccountingApp {
         return `
             <div class="gcap-report-container">
                 <div class="neumorphic-card mb-4">
-                    <div class="card-header d-flex justify-content-between align-items-center">
+                    <div class="card-header">
                         <h4 class="mb-0"><i class="bi bi-people me-2"></i>تقرير رأس المال العام (حسب المساهم)</h4>
-                        <div class="report-actions">
-                            <button class="btn btn-success neumorphic-btn btn-sm" onclick="app.printGeneralCapitalReport()">
-                                <i class="bi bi-printer me-1"></i>طباعة
-                            </button>
-                            <button class="btn btn-primary neumorphic-btn btn-sm ms-2" onclick="app.exportGeneralCapitalReport()">
-                                <i class="bi bi-download me-1"></i>تصدير
-                            </button>
-                        </div>
                     </div>
                 </div>
 
@@ -1532,9 +1524,19 @@ class AccountingApp {
                 </div>
 
                 <div class="neumorphic-card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0"><i class="bi bi-table me-2"></i>الجدول (تجميع حسب اسم المساهم)</h5>
-                        <div class="text-muted small" id="gcapCount"></div>
+                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <h5 class="mb-0"><i class="bi bi-table me-2"></i>الجدول (تجميع حسب اسم المساهم)</h5>
+                            <div class="text-muted small" id="gcapCount"></div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <button class="btn btn-success btn-sm neumorphic-btn" onclick="app.printGeneralCapitalReport()" title="طباعة الجدول">
+                                <i class="bi bi-printer"></i>
+                            </button>
+                            <button class="btn btn-primary btn-sm neumorphic-btn" onclick="app.exportGeneralCapitalReport()" title="تصدير JSON">
+                                <i class="bi bi-download"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body">
                         <div id="gcapTableWrap" class="table-responsive"></div>
