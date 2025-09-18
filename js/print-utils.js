@@ -18,10 +18,13 @@ window.PrintEngine = (function(){
     return `
       <style>
         :root { --header-h: ${headerHeightCm}cm; --footer-h: ${footerHeightCm}cm; --hsafe: ${sideSafeCm}cm; }
-        @page { size: A4 ${orientation}; margin: ${marginsCm}cm; }
+  /* Enable the built-in page counter and set page size/margins */
+  @page { size: A4 ${orientation}; margin: ${marginsCm}cm; counter-increment: page; }
         *, *::before, *::after { box-sizing: border-box; }
         html, body { width: 100%; max-width: 100%; }
-        body { font-family: 'Arial', sans-serif; margin: 0; direction: rtl; color: #333; line-height: 1.6; -webkit-print-color-adjust: exact; print-color-adjust: exact; overflow: visible; }
+  body { font-family: 'Arial', sans-serif; margin: 0; direction: rtl; color: #333; line-height: 1.6; -webkit-print-color-adjust: exact; print-color-adjust: exact; overflow: visible; }
+  /* Reset page counter for PrintEngine documents */
+  body.print-engine { counter-reset: page 0; }
         .print-frame { width: 100%; border-collapse: collapse; table-layout: fixed; }
         .print-frame thead { display: table-header-group; }
         .print-frame tfoot { display: table-footer-group; }
@@ -31,6 +34,8 @@ window.PrintEngine = (function(){
         .header-inner { height: var(--header-h); transform-origin: top center; }
         .footer-inner { height: var(--footer-h); transform-origin: bottom center; }
         .content-cell { padding: 0 var(--hsafe); }
+  /* Footer should stick to bottom on each printed page; numbers provided by page counter */
+  .print-frame .print-footer .page-number::after { content: counter(page); }
         #capitalReportTable, .table-responsive { overflow: visible !important; height: auto !important; max-height: none !important; break-inside: auto; page-break-inside: auto; }
         table { width: 100%; border-collapse: collapse; margin: 12px 0 18px 0; font-size: 12.5px; table-layout: fixed; page-break-inside: auto; }
         th, td { border: 1px solid #333; padding: 7px 5px; text-align: center; word-wrap: break-word; white-space: normal; max-width: 0; }
@@ -50,7 +55,7 @@ window.PrintEngine = (function(){
   }
 
   function render({title='مستند للطباعة', headerHTML='', footerHTML='', bodyHTML='', orientation='landscape', marginsCm=0.5, headerHeightCm=3, footerHeightCm=3, sideSafeCm=2.5}){
-    const head = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>${title}</title>${css({orientation,marginsCm,headerHeightCm,footerHeightCm,sideSafeCm})}</head><body>`;
+  const head = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>${title}</title>${css({orientation,marginsCm,headerHeightCm,footerHeightCm,sideSafeCm})}</head><body class="print-engine">`;
     const frame = `
       <table class="print-frame">
         <thead>
@@ -80,6 +85,161 @@ window.PrintEngine = (function(){
         const targetFooterPx = 3 * (96/2.54);
         if (headerInner){ const r=headerInner.getBoundingClientRect(); if (r.height>targetHeaderPx){ headerInner.style.transform = `scale(${Math.max(0.8, targetHeaderPx/r.height)})`; } }
         if (footerInner){ const r=footerInner.getBoundingClientRect(); if (r.height>targetFooterPx){ footerInner.style.transform = `scale(${Math.max(0.8, targetFooterPx/r.height)})`; } }
+
+        // Manual pagination fallback to ensure correct page numbers and footer placement
+        const styleEl = doc.createElement('style');
+        styleEl.textContent = `
+          /* Minimize impact: only what manual pagination needs */
+          @media print {
+            .no-print, .hide-on-print, .dt-buttons, .dataTables_filter, .dataTables_length, .dataTables_info, .dataTables_paginate { display: none !important; }
+          }
+          .manual-pagination .pe-pages { width: 100%; }
+          .manual-pagination .pe-page { page-break-after: always; display:flex; flex-direction:column; box-sizing:border-box; overflow: hidden; }
+          .manual-pagination .pe-page.pe-last { page-break-after: auto; }
+          /* Let content use its natural height; don't stretch it, measure real height */
+          .manual-pagination .pe-content { padding: 0 var(--hsafe); flex: 0 0 auto; overflow: visible; }
+          /* Footer inside manual pages participates in flex so it stays pinned at bottom */
+          .manual-pagination .footer-box { margin-top: auto; }
+          .manual-pagination .print-footer { position: static !important; box-shadow: none !important; margin: 0 !important; }
+          .manual-pagination .print-footer .page-number::after { content: '' !important; }
+        `;
+        doc.head.appendChild(styleEl);
+
+        const frame = doc.querySelector('table.print-frame');
+        const contentCell = doc.querySelector('.content-cell');
+        const headerHTML = headerInner ? headerInner.innerHTML : '';
+        const footerHTML = footerInner ? footerInner.innerHTML : '';
+
+        if (frame && contentCell) {
+          doc.body.classList.add('manual-pagination');
+
+          // Calculate available content height per page in px
+          // Detect orientation from @page rule
+          const pageRule = doc.head.innerHTML.match(/@page\s*\{[^}]*size:\s*A4\s*(portrait|landscape)?/i);
+          const isLandscape = pageRule ? /landscape/i.test(pageRule[0]) : true; // default PrintEngine is landscape
+          const A4_H = (isLandscape ? 21.0 : 29.7) * (96/2.54); // px
+          const marginsCm = 0.5; // default fallback
+          // Read margin and header/footer heights from CSS
+          const passedMarginsCmMatch = doc.head.innerHTML.match(/@page\s*\{[^}]*margin:\s*([0-9.]+)cm/i);
+          const effMarginsCm = passedMarginsCmMatch ? parseFloat(passedMarginsCmMatch[1]) : marginsCm;
+          const headerCmMatch = doc.head.innerHTML.match(/:root\s*\{[^}]*--header-h:\s*([0-9.]+)cm/i);
+          const footerCmMatch = doc.head.innerHTML.match(/:root\s*\{[^}]*--footer-h:\s*([0-9.]+)cm/i);
+          const headerCm = headerCmMatch ? parseFloat(headerCmMatch[1]) : 3;
+          const footerCm = footerCmMatch ? parseFloat(footerCmMatch[1]) : 3;
+          const cm2px = 96/2.54;
+          const pageHeightPx = A4_H - (effMarginsCm*2*cm2px) - ((headerCm + footerCm) * cm2px) - 2; // tighter buffer to reduce extra whitespace
+
+          // Build manual pages container
+          const pagesWrap = doc.createElement('div');
+          pagesWrap.className = 'pe-pages';
+          frame.style.display = 'none'; // hide original frame
+          doc.body.appendChild(pagesWrap);
+
+          const headerPx = headerCm * cm2px; const footerPx = footerCm * cm2px; const totalPagePx = Math.ceil(headerPx + pageHeightPx + footerPx);
+          function createPage(){
+            const page = doc.createElement('div'); page.className = 'pe-page';
+            page.style.height = totalPagePx + 'px';
+            page.style.minHeight = totalPagePx + 'px';
+            const headerBox = doc.createElement('div'); headerBox.className = 'header-box';
+            const headerInnerDiv = doc.createElement('div'); headerInnerDiv.className = 'header-inner'; headerInnerDiv.innerHTML = headerHTML;
+            headerBox.appendChild(headerInnerDiv);
+            const bodyDiv = doc.createElement('div'); bodyDiv.className = 'pe-content';
+            const footerBox = doc.createElement('div'); footerBox.className = 'footer-box';
+            const footerInnerDiv = doc.createElement('div'); footerInnerDiv.className = 'footer-inner'; footerInnerDiv.innerHTML = footerHTML;
+            footerBox.appendChild(footerInnerDiv);
+            page.appendChild(headerBox); page.appendChild(bodyDiv); page.appendChild(footerBox);
+            pagesWrap.appendChild(page);
+            return {page, bodyDiv, footerInnerDiv};
+          }
+
+          // Helper to set page numbers after building all pages
+          const pageRecords = [];
+          let current = createPage();
+
+          // Split content by blocks; special handling for TABLEs to split by rows
+          const nodes = Array.from(contentCell.children);
+          const appendAndCheck = (el) => {
+            current.bodyDiv.appendChild(el);
+            // Use scrollHeight for natural content height (avoids flex stretching/measurement glitches)
+            const h = current.bodyDiv.scrollHeight;
+            if (h > pageHeightPx) {
+              // If page currently has no content except this element, keep it here (it must overflow to next page anyway)
+              const hasOtherContent = current.bodyDiv.childNodes.length > 1;
+              if (hasOtherContent) {
+                current.bodyDiv.removeChild(el);
+                // finalize current page only if it has some content
+                pageRecords.push(current);
+                current = createPage();
+                current.bodyDiv.appendChild(el);
+              }
+            }
+          };
+
+          function processTable(table){
+            const cloneTable = doc.createElement('table');
+            cloneTable.setAttribute('style', table.getAttribute('style')||'');
+            cloneTable.className = table.className || '';
+            const thead = table.querySelector('thead');
+            if (thead) cloneTable.appendChild(thead.cloneNode(true));
+            let newTbody = doc.createElement('tbody');
+            cloneTable.appendChild(newTbody);
+            current.bodyDiv.appendChild(cloneTable);
+
+            const rows = Array.from(table.querySelectorAll('tbody tr'));
+            rows.forEach((row) => {
+              const rowClone = row.cloneNode(true);
+              newTbody.appendChild(rowClone);
+              const hNow = current.bodyDiv.scrollHeight;
+              if (hNow > pageHeightPx && newTbody.children.length > 1) {
+                // move last row to next page
+                newTbody.removeChild(rowClone);
+                pageRecords.push(current);
+                current = createPage();
+                // start a new table on the new page with header
+                const t2 = doc.createElement('table');
+                t2.setAttribute('style', table.getAttribute('style')||'');
+                t2.className = table.className || '';
+                if (thead) t2.appendChild(thead.cloneNode(true));
+                const tb2 = doc.createElement('tbody');
+                t2.appendChild(tb2);
+                current.bodyDiv.appendChild(t2);
+                tb2.appendChild(rowClone);
+                newTbody = tb2;
+              }
+            });
+          }
+
+          nodes.forEach(node => {
+            if (node.tagName === 'TABLE') {
+              processTable(node);
+            } else if (node.querySelector && node.querySelector('table')) {
+              // Append non-table parts of this node first
+              const shallowClone = node.cloneNode(true);
+              shallowClone.querySelectorAll('table').forEach(t => t.remove());
+              // If there is meaningful non-table content, append it
+              if (shallowClone.textContent.trim() || shallowClone.children.length) {
+                appendAndCheck(shallowClone);
+              }
+              // Then process tables inside in order
+              node.querySelectorAll('table').forEach(tbl => processTable(tbl));
+            } else {
+              appendAndCheck(node.cloneNode(true));
+            }
+          });
+
+          // Only push last page if it actually has content
+          if (current.bodyDiv.childNodes.length > 0) { pageRecords.push(current); }
+          const total = pageRecords.length;
+          pageRecords.forEach((rec, i) => {
+            const numEl = rec.footerInnerDiv.querySelector('.page-number');
+            if (numEl) {
+              numEl.textContent = `${i+1} / ${total}`;
+            }
+            if (i === total - 1) {
+              rec.page?.classList.add('pe-last');
+            }
+          });
+        }
       } catch(e){}
       setTimeout(()=>{ try{ w.print(); }catch(e){} }, 300);
     };
@@ -178,11 +338,12 @@ function buildPrintFooterHTML() {
   const footerStyles = `
     <style>
   /* Ensure page content leaves space for footer and show a separator line */
-  body { padding-bottom: 140px; }
+  /* Only add bottom padding when footer is fixed (non-PrintEngine contexts). */
+  body:not(.print-engine) { padding-bottom: 140px; }
   /* Page number badge (re-added to restore original behavior) */
   .print-footer .page-number { display:inline-block; padding:6px 10px; border-radius:8px; background:#f3f4f6; color:#374151; font-weight:700; }
   .print-footer .page-number:after { content: counter(page); }
-  /* Footer visual container */
+  /* Footer visual container; fixed by default for simple print windows */
   .print-footer { position:fixed; left:0; right:0; bottom:0; background:rgba(255,255,255,0.98); padding:10px 14px; font-size:12px; color:#333; z-index:4; box-shadow: 0 -2px 8px rgba(0,0,0,0.05); }
   .print-footer .row { display:flex; align-items:center; justify-content:space-between; }
       .print-footer .col-right { text-align:right; flex:1; }
@@ -204,10 +365,7 @@ function buildPrintFooterHTML() {
   .print-footer .phone-badge svg { width:12px; height:12px; flex-shrink:0; }
   /* Visible separator line */
   .print-footer .separator { width:100%; height:2px; background:#d0d0d0; margin-bottom:8px; border-radius:1px; }
-  /* Footer visual adjustments for print; page numbers removed globally */
-      @media print {
-        .print-footer { position:fixed; }
-      }
+  /* Keep footer fixed by default; PrintEngine will use page counters without changing positioning */
     </style>
   `;
 
