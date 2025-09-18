@@ -1,3 +1,92 @@
+// PrintEngine: unified print layout for A4 with fixed header/footer and flowing content
+// Usage:
+//   const html = PrintEngine.render({
+//     title: 'تقرير رأس المال الشامل',
+//     headerHTML: buildBrandedHeaderHTML('تقرير رأس المال الشامل'),
+//     footerHTML: buildPrintFooterHTML ? buildPrintFooterHTML() : '',
+//     bodyHTML: contentHTML,
+//     orientation: 'landscape', // or 'portrait'
+//     marginsCm: 0.5,
+//     headerHeightCm: 3,
+//     footerHeightCm: 3,
+//     sideSafeCm: 2.5,
+//   });
+//   PrintEngine.print(html);
+
+window.PrintEngine = (function(){
+  function css({orientation='landscape', marginsCm=0.5, headerHeightCm=3, footerHeightCm=3, sideSafeCm=2.5}){
+    return `
+      <style>
+        :root { --header-h: ${headerHeightCm}cm; --footer-h: ${footerHeightCm}cm; --hsafe: ${sideSafeCm}cm; }
+        @page { size: A4 ${orientation}; margin: ${marginsCm}cm; }
+        *, *::before, *::after { box-sizing: border-box; }
+        html, body { width: 100%; max-width: 100%; }
+        body { font-family: 'Arial', sans-serif; margin: 0; direction: rtl; color: #333; line-height: 1.6; -webkit-print-color-adjust: exact; print-color-adjust: exact; overflow: visible; }
+        .print-frame { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .print-frame thead { display: table-header-group; }
+        .print-frame tfoot { display: table-footer-group; }
+        .print-frame td { padding: 0; border: 0; }
+        .header-box { height: var(--header-h); overflow: hidden; }
+        .footer-box { height: var(--footer-h); overflow: hidden; }
+        .header-inner { height: var(--header-h); transform-origin: top center; }
+        .footer-inner { height: var(--footer-h); transform-origin: bottom center; }
+        .content-cell { padding: 0 var(--hsafe); }
+        #capitalReportTable, .table-responsive { overflow: visible !important; height: auto !important; max-height: none !important; break-inside: auto; page-break-inside: auto; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0 18px 0; font-size: 12.5px; table-layout: fixed; page-break-inside: auto; }
+        th, td { border: 1px solid #333; padding: 7px 5px; text-align: center; word-wrap: break-word; white-space: normal; max-width: 0; }
+        th { background-color: #34495e; color: #fff; font-weight: bold; font-size: 15px; }
+        .table-success { background-color: #d4edda !important; font-weight: bold; }
+        .text-success { color: #28a745 !important; font-weight: bold; }
+        .text-primary { color: #007bff !important; font-weight: bold; }
+        .summary-section { margin: 10px 0 18px; padding: 10px 12px; border: 2px solid #333; border-radius: 10px; background: #f8f9fa; page-break-inside: avoid; box-shadow: none; }
+        .summary-title { font-size: 18px; font-weight: bold; text-align: center; margin-bottom: 15px; color: #2c3e50; }
+        .summary-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; text-align: center; }
+        .summary-item { padding: 12px; border: 1px solid #ddd; border-radius: 8px; background: #fff; box-shadow: none; }
+        .summary-label { font-size: 14px; color: #666; margin-bottom: 5px; }
+        .summary-value { font-size: 18px; font-weight: bold; color: #2c3e50; }
+        @media print { html, body { height: auto; overflow: visible; } body { padding: 0; } table { break-inside: auto; } }
+      </style>
+    `;
+  }
+
+  function render({title='مستند للطباعة', headerHTML='', footerHTML='', bodyHTML='', orientation='landscape', marginsCm=0.5, headerHeightCm=3, footerHeightCm=3, sideSafeCm=2.5}){
+    const head = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>${title}</title>${css({orientation,marginsCm,headerHeightCm,footerHeightCm,sideSafeCm})}</head><body>`;
+    const frame = `
+      <table class="print-frame">
+        <thead>
+          <tr><td><div class="header-box"><div class="header-inner">${headerHTML||''}</div></div></td></tr>
+        </thead>
+        <tbody>
+          <tr><td class="content-cell">${bodyHTML||''}</td></tr>
+        </tbody>
+        <tfoot>
+          <tr><td><div class="footer-box"><div class="footer-inner">${footerHTML||''}</div></div></td></tr>
+        </tfoot>
+      </table>
+    `;
+    const tail = `</body></html>`;
+    return head + frame + tail;
+  }
+
+  function print(html){
+    const w = window.open('', '_blank', 'width=1200,height=800');
+    w.document.write(html); w.document.close();
+    w.onload = () => {
+      try {
+        const doc = w.document;
+        const headerInner = doc.querySelector('.header-inner');
+        const footerInner = doc.querySelector('.footer-inner');
+        const targetHeaderPx = 3 * (96/2.54);
+        const targetFooterPx = 3 * (96/2.54);
+        if (headerInner){ const r=headerInner.getBoundingClientRect(); if (r.height>targetHeaderPx){ headerInner.style.transform = `scale(${Math.max(0.8, targetHeaderPx/r.height)})`; } }
+        if (footerInner){ const r=footerInner.getBoundingClientRect(); if (r.height>targetFooterPx){ footerInner.style.transform = `scale(${Math.max(0.8, targetFooterPx/r.height)})`; } }
+      } catch(e){}
+      setTimeout(()=>{ try{ w.print(); }catch(e){} }, 300);
+    };
+  }
+
+  return { render, print };
+})();
 // build-branded header for print windows
 function buildBrandedHeaderHTML(title) {
     const appSettings = (typeof StorageManager !== 'undefined') ? StorageManager.getData(StorageManager.STORAGE_KEYS.SETTINGS) || {} : {};
