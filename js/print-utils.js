@@ -239,6 +239,37 @@ window.PrintEngine = (function(){
               rec.page?.classList.add('pe-last');
             }
           });
+
+          // Safety: Deduplicate table headers that may appear twice on the same page
+          // (some sources include a header-like first row or duplicated thead)
+          (function dedupeTableHeaders(root){
+            try {
+              const tables = root.querySelectorAll('table');
+              tables.forEach(tbl => {
+                const thead = tbl.querySelector('thead');
+                const tbody = tbl.querySelector('tbody');
+                if (!thead || !tbody) return;
+                const headRows = Array.from(thead.querySelectorAll('tr'));
+                // If thead has duplicate consecutive rows, remove the second
+                if (headRows.length > 1) {
+                  const a = headRows[0].innerText.replace(/\s+/g,' ').trim();
+                  const b = headRows[1].innerText.replace(/\s+/g,' ').trim();
+                  if (a && b && a === b) {
+                    headRows[1].remove();
+                  }
+                }
+                // If the first tbody row matches the header row exactly, remove it
+                const bodyFirst = tbody.querySelector('tr');
+                if (headRows[0] && bodyFirst) {
+                  const ht = headRows[0].innerText.replace(/\s+/g,' ').trim();
+                  const bt = bodyFirst.innerText.replace(/\s+/g,' ').trim();
+                  if (ht && bt && ht === bt) {
+                    bodyFirst.remove();
+                  }
+                }
+              });
+            } catch (_) { /* ignore */ }
+          })(pagesWrap);
         }
       } catch(e){}
       setTimeout(()=>{ try{ w.print(); }catch(e){} }, 300);
@@ -340,9 +371,11 @@ function buildPrintFooterHTML() {
   /* Ensure page content leaves space for footer and show a separator line */
   /* Only add bottom padding when footer is fixed (non-PrintEngine contexts). */
   body:not(.print-engine) { padding-bottom: 140px; }
-  /* Page number badge (re-added to restore original behavior) */
-  .print-footer .page-number { display:inline-block; padding:6px 10px; border-radius:8px; background:#f3f4f6; color:#374151; font-weight:700; }
-  .print-footer .page-number:after { content: counter(page); }
+  /* Page number badge: hidden by default to avoid showing "0" in simple prints.
+     It will be shown only for PrintEngine documents (body.print-engine) where
+     pagination logic populates its text content. */
+  .print-footer .page-number { display:none; padding:6px 10px; border-radius:8px; background:#f3f4f6; color:#374151; font-weight:700; }
+  .print-engine .print-footer .page-number { display:inline-block; }
   /* Footer visual container; fixed by default for simple print windows */
   .print-footer { position:fixed; left:0; right:0; bottom:0; background:rgba(255,255,255,0.98); padding:10px 14px; font-size:12px; color:#333; z-index:4; box-shadow: 0 -2px 8px rgba(0,0,0,0.05); }
   .print-footer .row { display:flex; align-items:center; justify-content:space-between; }
