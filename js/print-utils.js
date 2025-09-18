@@ -18,13 +18,12 @@ window.PrintEngine = (function(){
     return `
       <style>
         :root { --header-h: ${headerHeightCm}cm; --footer-h: ${footerHeightCm}cm; --hsafe: ${sideSafeCm}cm; }
-  /* Enable the built-in page counter and set page size/margins */
-  @page { size: A4 ${orientation}; margin: ${marginsCm}cm; counter-increment: page; }
+  /* Page size and margins only; let the user agent manage page counters */
+  @page { size: A4 ${orientation}; margin: ${marginsCm}cm; }
         *, *::before, *::after { box-sizing: border-box; }
         html, body { width: 100%; max-width: 100%; }
   body { font-family: 'Arial', sans-serif; margin: 0; direction: rtl; color: #333; line-height: 1.6; -webkit-print-color-adjust: exact; print-color-adjust: exact; overflow: visible; }
-  /* Reset page counter for PrintEngine documents */
-  body.print-engine { counter-reset: page 0; }
+  /* No explicit page counter reset; UA manages counter(page) */
         .print-frame { width: 100%; border-collapse: collapse; table-layout: fixed; }
         .print-frame thead { display: table-header-group; }
         .print-frame tfoot { display: table-footer-group; }
@@ -34,8 +33,7 @@ window.PrintEngine = (function(){
         .header-inner { height: var(--header-h); transform-origin: top center; }
         .footer-inner { height: var(--footer-h); transform-origin: bottom center; }
         .content-cell { padding: 0 var(--hsafe); }
-  /* Footer should stick to bottom on each printed page; numbers provided by page counter */
-  .print-frame .print-footer .page-number::after { content: counter(page); }
+  /* Footer sticks to bottom on each printed page */
         #capitalReportTable, .table-responsive { overflow: visible !important; height: auto !important; max-height: none !important; break-inside: auto; page-break-inside: auto; }
         table { width: 100%; border-collapse: collapse; margin: 12px 0 18px 0; font-size: 12.5px; table-layout: fixed; page-break-inside: auto; }
         th, td { border: 1px solid #333; padding: 7px 5px; text-align: center; word-wrap: break-word; white-space: normal; max-width: 0; }
@@ -370,12 +368,17 @@ function buildPrintFooterHTML() {
     <style>
   /* Ensure page content leaves space for footer and show a separator line */
   /* Only add bottom padding when footer is fixed (non-PrintEngine contexts). */
-  body:not(.print-engine) { padding-bottom: 140px; }
+  body:not(.print-engine) { padding-bottom: 180px; }
+  /* Ensure the main printable content leaves space for footer height + safety gap */
+  @media print { .print-body { padding-bottom: calc(var(--footer-h, 3cm) + 0.2cm); } }
   /* Page number badge: hidden by default to avoid showing "0" in simple prints.
      It will be shown only for PrintEngine documents (body.print-engine) where
      pagination logic populates its text content. */
   .print-footer .page-number { display:none; padding:6px 10px; border-radius:8px; background:#f3f4f6; color:#374151; font-weight:700; }
   .print-engine .print-footer .page-number { display:inline-block; }
+  /* Allow enabling page numbers for simple print windows when body has .has-page-number */
+  .has-page-number .print-footer .page-number { display:inline-block; }
+  .has-page-number .print-footer .page-number:after { content: counter(page); }
   /* Footer visual container; fixed by default for simple print windows */
   .print-footer { position:fixed; left:0; right:0; bottom:0; background:rgba(255,255,255,0.98); padding:10px 14px; font-size:12px; color:#333; z-index:4; box-shadow: 0 -2px 8px rgba(0,0,0,0.05); }
   .print-footer .row { display:flex; align-items:center; justify-content:space-between; }

@@ -1183,76 +1183,70 @@ class CapitalManager {
             `;
         }).join('');
 
-        const styles = `
-            <style>
-                @page { size: A4 landscape; margin: 12mm; }
-                body { direction: rtl; }
-                table { width: 100%; border-collapse: collapse; }
-                thead th { background: #f3f4f6; }
-                th, td { border: 1px solid #ddd; padding: 8px; font-size: 12px; }
-                .meta { margin: 8px 0 12px; font-size: 12px; color: #555; }
-                .totals-row { display: flex; gap: 12px; margin-top: 12px; }
-                .total-card { flex: 1; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; background: #f9fafb; }
-                .total-card.usd { border-color: rgba(22,163,74,0.25); background: #ecfdf5; }
-                .total-card.iqd { border-color: rgba(29,78,216,0.25); background: #eff6ff; }
-                .total-card .label { font-weight: 700; color: #374151; margin-bottom: 6px; }
-                .total-card .value { font-size: 16px; font-weight: 800; color: #111827; }
-            </style>
-        `;
-
         const title = 'تقرير نتائج بحث رأس المال';
-        const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML(title) : `<h3>${title}</h3>`;
-        const footer = (typeof buildPrintFooterHTML === 'function') ? buildPrintFooterHTML() : '';
-
-        const html = `
-            <!doctype html>
-            <html lang="ar" dir="rtl">
-            <head><meta charset="utf-8"/>${styles}</head>
-            <body>
-                ${header}
-                <div class="print-body">
-                    <div class="meta">عدد السجلات: ${results.length}</div>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>رقم التسجيل</th>
-                                <th>المساهم</th>
-                                <th>النوع</th>
-                                <th>المبلغ</th>
-                                <th>العملة</th>
-                                <th>التاريخ</th>
-                                <th>رقم الإيصال</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${rowsHtml}
-                        </tbody>
-                    </table>
-                    <div class="totals-row">
-                        <div class="total-card iqd">
-                            <div class="label">إجمالي الدينار</div>
-                            <div class="value">${totalIQDStr}</div>
-                        </div>
-                        <div class="total-card usd">
-                            <div class="label">إجمالي الدولار</div>
-                            <div class="value">${totalUSDStr}</div>
-                        </div>
+        // Prefer PrintEngine for robust paging + footer spacing + page numbers
+        if (window.PrintEngine) {
+            const headerHTML = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML(title) : '';
+            const footerHTML = (typeof buildPrintFooterHTML === 'function') ? buildPrintFooterHTML() : '';
+            const bodyHTML = `
+                <div class="meta">عدد السجلات: ${results.length}</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>رقم التسجيل</th>
+                            <th>المساهم</th>
+                            <th>النوع</th>
+                            <th>المبلغ</th>
+                            <th>العملة</th>
+                            <th>التاريخ</th>
+                            <th>رقم الإيصال</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+                <div class="totals-row" style="display:flex;gap:12px;margin-top:12px;">
+                    <div class="total-card iqd" style="flex:1;border:1px solid #e5e7eb;border-radius:10px;padding:12px;background:#eff6ff;">
+                        <div class="label" style="font-weight:700;color:#374151;margin-bottom:6px;">إجمالي الدينار</div>
+                        <div class="value" style="font-size:16px;font-weight:800;color:#111827;">${totalIQDStr}</div>
                     </div>
-                </div>
-                ${footer}
-                <script>setTimeout(function(){ window.print(); setTimeout(function(){ window.close(); }, 300); }, 200);</script>
-            </body>
-            </html>
-        `;
+                    <div class="total-card usd" style="flex:1;border:1px solid #e5e7eb;border-radius:10px;padding:12px;background:#ecfdf5;">
+                        <div class="label" style="font-weight:700;color:#374151;margin-bottom:6px;">إجمالي الدولار</div>
+                        <div class="value" style="font-size:16px;font-weight:800;color:#111827;">${totalUSDStr}</div>
+                    </div>
+                </div>`;
+            const html = window.PrintEngine.render({
+                title,
+                headerHTML,
+                footerHTML,
+                bodyHTML,
+                orientation: 'landscape',
+                marginsCm: 0.5,
+                headerHeightCm: 3,
+                footerHeightCm: 3,
+                sideSafeCm: 2.5,
+            });
+            window.PrintEngine.print(html);
+        } else {
+            // Fallback: legacy window-based print (may not show page numbers across pages)
+            const styles = `
+                <style>
+                    @page { size: A4 landscape; margin: 12mm 12mm 32mm 12mm; }
+                    body { direction: rtl; }
+                    table { width: 100%; border-collapse: collapse; }
+                    thead th { background: #f3f4f6; }
+                    th, td { border: 1px solid #ddd; padding: 8px; font-size: 12px; }
+                    .meta { margin: 8px 0 12px; font-size: 12px; color: #555; }
+                </style>`;
+            const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML(title) : `<h3>${title}</h3>`;
+            const footer = (typeof buildPrintFooterHTML === 'function') ? buildPrintFooterHTML() : '';
+            const html = `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"/>${styles}</head><body class="has-page-number">${header}<div class="print-body"><div class="meta">عدد السجلات: ${results.length}</div><table><thead><tr><th>رقم التسجيل</th><th>المساهم</th><th>النوع</th><th>المبلغ</th><th>العملة</th><th>التاريخ</th><th>رقم الإيصال</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>${footer}<script>setTimeout(function(){ window.print(); setTimeout(function(){ window.close(); }, 300); }, 200);</script></body></html>`;
 
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) {
-            this.showNotification('تعذّر فتح نافذة الطباعة. الرجاء السماح بالنوافذ المنبثقة.', 'error');
-            return;
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) { this.showNotification('تعذّر فتح نافذة الطباعة. الرجاء السماح بالنوافذ المنبثقة.', 'error'); return; }
+            printWindow.document.open();
+            printWindow.document.write(html);
+            printWindow.document.close();
         }
-        printWindow.document.open();
-        printWindow.document.write(html);
-        printWindow.document.close();
     }
 
     // Display search results
@@ -1434,7 +1428,7 @@ class CapitalManager {
                 <title>سند رأس مال</title>
                 <link rel="stylesheet" href="css/style.css">
             </head>
-            <body>
+            <body class="has-page-number">
                 ${header}
                 <div class="receipt-body">${receiptBody}</div>
                 ${buildPrintFooterHTML ? buildPrintFooterHTML() : ''}
@@ -1481,7 +1475,7 @@ class CapitalManager {
                 <title>سند رأس مال</title>
                 <link rel="stylesheet" href="css/style.css">
             </head>
-            <body>
+            <body class="has-page-number">
                 ${header}
                 <div class="receipt-body">${receiptBody}</div>
                 ${buildPrintFooterHTML ? buildPrintFooterHTML() : ''}
