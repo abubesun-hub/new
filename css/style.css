@@ -1195,3 +1195,43 @@ body {
 .badge {
     font-size: 0.75em;
 }
+
+/* === Credit Purchase Settlements: Input highlighting === */
+/* Read-only summary fields */
+.cp-input-ro {
+    background: #f3f4f6 !important; /* tailwind gray-100 */
+    color: #6b7280 !important;       /* gray-500 */
+    border: 1px solid #e5e7eb !important; /* gray-200 */
+    box-shadow: none !important;
+}
+
+/* Editable but optional fields */
+.cp-input-edit {
+    background: #eef6ff !important; /* soft blue */
+    border: 1px solid #bcdcff !important;
+}
+.cp-input-edit:focus {
+    background: #e6f2ff !important;
+    border-color: #89c2ff !important;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.15) !important;
+}
+
+/* Required data-entry fields (emphasized) */
+.cp-input-required {
+    background: #fff8db !important; /* soft amber */
+    border: 1px solid #f4c95d !important;
+}
+.cp-input-required:focus {
+    background: #fff3bf !important;
+    border-color: #ff9800 !important;
+    box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.22) !important;
+}
+
+/* Small legend for users */
+.cp-legend { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.cp-legend .item { display:flex; align-items:center; gap:6px; font-size: 0.8rem; color:#445; }
+.cp-legend .swatch { width:16px; height:12px; border:1px solid #ccd; border-radius:3px; display:inline-block; }
+.cp-legend .swatch.ro { background:#f3f4f6; border-color:#e5e7eb; }
+.cp-legend .swatch.edit { background:#eef6ff; border-color:#bcdcff; }
+.cp-legend .swatch.req { background:#fff8db; border-color:#f4c95d; }

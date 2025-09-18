@@ -316,55 +316,55 @@ class ExpensesManager {
                             <form id="cpSettlementForm" class="row g-2">
                                 <div class="col-12">
                                     <label class="form-label small">القيد المختار</label>
-                                    <input type="text" id="cpSettlReg" class="form-control form-control-sm" readonly placeholder="اختر قيداً من الجدول">
+                                    <input type="text" id="cpSettlReg" class="form-control form-control-sm cp-input-ro" readonly placeholder="اختر قيداً من الجدول">
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small">المورد</label>
-                                    <input type="text" id="cpSettlVendor" class="form-control form-control-sm" readonly>
+                                    <input type="text" id="cpSettlVendor" class="form-control form-control-sm cp-input-ro" readonly>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small">تاريخ الدفع</label>
-                                    <input type="date" id="cpSettlDate" class="form-control form-control-sm" value="${new Date().toISOString().split('T')[0]}">
+                                    <input type="date" id="cpSettlDate" class="form-control form-control-sm cp-input-required" value="${new Date().toISOString().split('T')[0]}">
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small">إجمالي القيد $</label>
-                                    <input type="text" id="cpSettlTotalUSD" class="form-control form-control-sm" readonly>
+                                    <input type="text" id="cpSettlTotalUSD" class="form-control form-control-sm cp-input-ro" readonly>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small">إجمالي القيد د.ع</label>
-                                    <input type="text" id="cpSettlTotalIQD" class="form-control form-control-sm" readonly>
+                                    <input type="text" id="cpSettlTotalIQD" class="form-control form-control-sm cp-input-ro" readonly>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small">المسدد حتى الآن $</label>
-                                    <input type="text" id="cpSettlPaidUSD" class="form-control form-control-sm" readonly>
+                                    <input type="text" id="cpSettlPaidUSD" class="form-control form-control-sm cp-input-ro" readonly>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small">المسدد حتى الآن د.ع</label>
-                                    <input type="text" id="cpSettlPaidIQD" class="form-control form-control-sm" readonly>
+                                    <input type="text" id="cpSettlPaidIQD" class="form-control form-control-sm cp-input-ro" readonly>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small">المتبقي $</label>
-                                    <input type="text" id="cpSettlRemainUSD" class="form-control form-control-sm" readonly>
+                                    <input type="text" id="cpSettlRemainUSD" class="form-control form-control-sm cp-input-ro" readonly>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small">المتبقي د.ع</label>
-                                    <input type="text" id="cpSettlRemainIQD" class="form-control form-control-sm" readonly>
+                                    <input type="text" id="cpSettlRemainIQD" class="form-control form-control-sm cp-input-ro" readonly>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small">مبلغ الدفع (دولار)</label>
-                                    <input type="number" step="0.01" min="0" id="cpSettlPayUSD" class="form-control form-control-sm" placeholder="0.00">
+                                    <input type="number" step="0.01" min="0" id="cpSettlPayUSD" class="form-control form-control-sm cp-input-required" placeholder="0.00">
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small">مبلغ الدفع (دينار)</label>
-                                    <input type="number" step="1" min="0" id="cpSettlPayIQD" class="form-control form-control-sm" placeholder="0">
+                                    <input type="number" step="1" min="0" id="cpSettlPayIQD" class="form-control form-control-sm cp-input-required" placeholder="0">
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small">سعر الصرف</label>
-                                    <input type="number" step="0.01" min="0" id="cpSettlExRate" class="form-control form-control-sm" value="1500">
+                                    <input type="number" step="0.01" min="0" id="cpSettlExRate" class="form-control form-control-sm cp-input-edit" value="1500">
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small">طريقة الدفع</label>
-                                    <select id="cpSettlMethod" class="form-select form-select-sm">
+                                    <select id="cpSettlMethod" class="form-select form-select-sm cp-input-required">
                                         <option value="cash">نقداً</option>
                                         <option value="bank_transfer">تحويل بنكي</option>
                                         <option value="check">شيك</option>
@@ -373,29 +373,29 @@ class ExpensesManager {
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small">رقم مرجع/وصل</label>
-                                    <input type="text" id="cpSettlRef" class="form-control form-control-sm" placeholder="اختياري">
+                                    <input type="text" id="cpSettlRef" class="form-control form-control-sm cp-input-edit" placeholder="اختياري">
                                 </div>
                                 <!-- الحقول المطلوبة لتطابق قيد المصروف -->
                                 <div class="col-md-6">
                                     <label class="form-label small">رقم الوصل</label>
-                                    <input type="text" id="cpSettlReceiptNo" class="form-control form-control-sm" placeholder="رقم الوصل (اختياري)">
+                                    <input type="text" id="cpSettlReceiptNo" class="form-control form-control-sm cp-input-edit" placeholder="رقم الوصل (اختياري)">
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small">الدليل المحاسبي</label>
-                                    <select id="cpSettlAccGuide" class="form-select form-select-sm">
+                                    <select id="cpSettlAccGuide" class="form-select form-select-sm cp-input-edit js-expense-required">
                                         <option value="">اختر من الدليل المحاسبي</option>
                                         ${this.getAccountingGuideOptions()}
                                     </select>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small">فئة المصروف</label>
-                                    <select id="cpSettlCategory" class="form-select form-select-sm">
+                                    <select id="cpSettlCategory" class="form-select form-select-sm cp-input-edit js-expense-required">
                                         ${['<option value="">اختر الفئة</option>'].concat(this.getExpenseCategories().map(c=>`<option value="${c}" ${c==='تسديد مشتريات آجل'?'selected':''}>${c}</option>`)).join('')}
                                     </select>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small">المشروع</label>
-                                    <select id="cpSettlProject" class="form-select form-select-sm">
+                                    <select id="cpSettlProject" class="form-select form-select-sm cp-input-edit">
                                         <option value="">اختر المشروع</option>
                                         <option value="مشروع 1">مشروع البناء الرئيسي</option>
                                         <option value="مشروع 2">مشروع التوسعة</option>
@@ -405,12 +405,17 @@ class ExpensesManager {
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label small">ملاحظات</label>
-                                    <textarea id="cpSettlNotes" rows="2" class="form-control form-control-sm" placeholder="تفاصيل إضافية"></textarea>
+                                    <textarea id="cpSettlNotes" rows="2" class="form-control form-control-sm cp-input-edit" placeholder="تفاصيل إضافية"></textarea>
                                 </div>
                                 <div class="col-12 d-flex align-items-center gap-2">
                                     <div class="form-check">
                                         <input class="form-check-input" type="checkbox" id="cpSettlCreateExpense" checked>
                                         <label class="form-check-label small" for="cpSettlCreateExpense">إنشاء قيد مصروف تلقائياً لهذا الدفع</label>
+                                    </div>
+                                    <div class="ms-auto cp-legend small">
+                                        <span class="item"><span class="swatch ro"></span> خانات ملخصة</span>
+                                        <span class="item"><span class="swatch req"></span> خانات مطلوبة</span>
+                                        <span class="item"><span class="swatch edit"></span> خانات اختيارية</span>
                                     </div>
                                 </div>
                                 <div class="col-12 d-flex flex-wrap gap-2">
@@ -472,6 +477,20 @@ class ExpensesManager {
                 };
                 this.addCreditPurchasePayment(reg, data);
             });
+            // ديناميكية إبراز الحقول المرتبطة بإنشاء قيد مصروف
+            const createExpChk = document.getElementById('cpSettlCreateExpense');
+            const toggleExpenseRequired = ()=>{
+                const req = !!createExpChk?.checked;
+                const targets = document.querySelectorAll('#cpSettlementForm .js-expense-required');
+                targets.forEach(el=>{
+                    el.classList.toggle('cp-input-required', req);
+                    el.classList.toggle('cp-input-edit', !req);
+                });
+            };
+            if(createExpChk){
+                createExpChk.addEventListener('change', toggleExpenseRequired);
+                toggleExpenseRequired();
+            }
         }
         const resetBtn = document.getElementById('cpSettlResetBtn');
         if(resetBtn){ resetBtn.onclick = ()=>{
