@@ -716,11 +716,55 @@ class ExpensesManager {
         const header = (typeof buildBrandedHeaderHTML === 'function') ? buildBrandedHeaderHTML('سند صرف - دفعة تسديد آجل') : '';
         const footer = (typeof buildPrintFooterHTML === 'function') ? buildPrintFooterHTML() : '';
         const html = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>طباعة دفعة - ${entry.registrationNumber}</title>
-        <style>@page{size:A4;margin:8mm}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:12px}}.receipt-container{max-width:700px!important;padding:12px!important;border-width:1px!important;margin:0 auto!important}.receipt-body{margin:12px 0!important}</style>
-        </head><body>${header}<div class="receipt-body">${body}</div>${footer}</body></html>`;
+        <style>
+            @page{size:A4;margin:8mm}
+            @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:12px}}
+            body{padding-bottom:0!important}
+            .print-footer{position:static!important;box-shadow:none!important}
+            .receipt-container{max-width:700px!important;padding:12px!important;border-width:1px!important;margin:0 auto!important}
+            .receipt-body{margin:12px 0!important}
+            /* Fit-to-one-page helpers */
+            .fit-one{position:relative; overflow:hidden; break-inside:avoid; page-break-inside:avoid; page-break-after:avoid;}
+            .fit-one .content-inner{transform-origin: top center;}
+        </style>
+        </head><body>${header}<div id="fitOne" class="fit-one"><div class="content-inner receipt-body">${body}</div></div>${footer}</body></html>`;
         const w = window.open('', '_blank', 'width=900,height=700');
         w.document.write(html); w.document.close();
-        w.onload = ()=> setTimeout(()=>{ try{ w.print(); }catch(_){} },300);
+        w.onload = ()=> {
+            try{
+                const cm2px = 96/2.54;
+                const pageH = 29.7*cm2px; // A4 portrait height
+                const marginCm = 0.8; // from @page margin:8mm
+                const marginsPx = marginCm*2*cm2px;
+                const doc = w.document;
+                const wrap = doc.getElementById('fitOne');
+                const inner = wrap ? wrap.querySelector('.content-inner') : null;
+                const applyScale = ()=>{
+                    if(!inner || !wrap) return;
+                    // Recompute header/footer height every time to avoid late reflows
+                    const headerEl = doc.querySelector('.print-header');
+                    const footerEl = doc.querySelector('.print-footer');
+                    const headerH = headerEl ? headerEl.getBoundingClientRect().height : 0;
+                    const footerH = footerEl ? footerEl.getBoundingClientRect().height : 0;
+                    const avail = pageH - marginsPx - headerH - footerH - 24; // safer buffer
+                    if(avail <= 0) return;
+                    inner.style.transform = '';
+                    const h = inner.getBoundingClientRect().height;
+                    if(h>avail){
+                        const scale = Math.max(0.55, avail/h);
+                        inner.style.transform = `scale(${scale})`;
+                        wrap.style.height = `${avail}px`;
+                        wrap.style.overflow = 'hidden';
+                    } else {
+                        wrap.style.height = 'auto';
+                    }
+                };
+                applyScale();
+                setTimeout(applyScale, 120);
+                setTimeout(applyScale, 240);
+            }catch(_){ }
+            setTimeout(()=>{ try{ w.print(); }catch(_){} },360);
+        };
     }
 
     addCreditPurchasePayment(regNo, payment){
@@ -858,6 +902,8 @@ class ExpensesManager {
         <style>
             @page { size: A4; margin: 8mm; }
             @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; font-size: 12px; } }
+            body{padding-bottom:0!important}
+            .print-footer{position:static!important;box-shadow:none!important}
             .receipt-container { max-width: 700px !important; padding: 12px !important; border-width: 1px !important; margin: 0 auto !important; }
             .header { margin-bottom: 8px !important; padding-bottom: 8px !important; }
             .company-name, .receipt-title { display: none !important; }
@@ -876,11 +922,47 @@ class ExpensesManager {
             .print-header .print-sub { font-size: 10px !important; margin-bottom: 4px !important; }
             .print-header .program-name { font-size: 14px !important; }
             .print-footer { padding: 6px 10px !important; font-size: 11px !important; }
+            /* Fit-to-one-page helpers */
+            .fit-one{position:relative; overflow:hidden; break-inside:avoid; page-break-inside:avoid; page-break-after:avoid;}
+            .fit-one .content-inner{transform-origin: top center;}
         </style>
-        </head><body>${header}<div class="receipt-body">${bodyHtml}</div>${footer}</body></html>`;
+        </head><body>${header}<div id="fitOne" class="fit-one"><div class="content-inner receipt-body">${bodyHtml}</div></div>${footer}</body></html>`;
         const win = window.open('', '_blank', 'width=900,height=700');
         win.document.write(html); win.document.close();
-        win.onload = () => setTimeout(()=>{ try { win.print(); } catch(_){} }, 300);
+        win.onload = () => {
+            try{
+                const cm2px = 96/2.54;
+                const pageH = 29.7*cm2px; // A4 portrait
+                const marginCm = 0.8; // 8mm
+                const marginsPx = marginCm*2*cm2px;
+                const doc = win.document;
+                const wrap = doc.getElementById('fitOne');
+                const inner = wrap ? wrap.querySelector('.content-inner') : null;
+                const applyScale = ()=>{
+                    if(!inner || !wrap) return;
+                    const headerEl = doc.querySelector('.print-header');
+                    const footerEl = doc.querySelector('.print-footer');
+                    const headerH = headerEl ? headerEl.getBoundingClientRect().height : 0;
+                    const footerH = footerEl ? footerEl.getBoundingClientRect().height : 0;
+                    const avail = pageH - marginsPx - headerH - footerH - 24; // safer buffer
+                    if(avail <= 0) return;
+                    inner.style.transform = '';
+                    const h = inner.getBoundingClientRect().height;
+                    if(h>avail){
+                        const scale = Math.max(0.55, avail/h);
+                        inner.style.transform = `scale(${scale})`;
+                        wrap.style.height = `${avail}px`;
+                        wrap.style.overflow = 'hidden';
+                    } else {
+                        wrap.style.height = 'auto';
+                    }
+                };
+                applyScale();
+                setTimeout(applyScale, 120);
+                setTimeout(applyScale, 240);
+            }catch(_){ }
+            setTimeout(()=>{ try { win.print(); } catch(_){} }, 360);
+        };
     }
 
     // (تمت إزالة تقرير أعمار الديون بناءً على طلب المستخدم)
