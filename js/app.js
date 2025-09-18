@@ -826,13 +826,21 @@ class AccountingApp {
                 <meta charset="UTF-8">
                 <title>تقرير رأس المال</title>
                 <style>
-                    body {
-                        font-family: 'Arial', sans-serif;
-                        margin: 20px;
-                        direction: rtl;
-                        color: #333;
-                        line-height: 1.6;
-                    }
+                    :root { --header-h: 3cm; --footer-h: 3cm; --hsafe: 2.5cm; }
+                    @page { size: A4 landscape; margin: 0.5cm; }
+                    *, *::before, *::after { box-sizing: border-box; }
+                    html, body { width: 100%; max-width: 100%; }
+                    body { font-family: 'Arial', sans-serif; margin: 0; direction: rtl; color: #333; line-height: 1.6; -webkit-print-color-adjust: exact; print-color-adjust: exact; overflow: visible; }
+                    /* Frame uses thead/tfoot to repeat header/footer and allow content to flow */
+                    .print-frame { width: 100%; border-collapse: collapse; table-layout: fixed; }
+                    .print-frame thead { display: table-header-group; }
+                    .print-frame tfoot { display: table-footer-group; }
+                    .print-frame td { padding: 0; border: 0; }
+                    .header-box { height: var(--header-h); overflow: hidden; }
+                    .footer-box { height: var(--footer-h); overflow: hidden; }
+                    .header-inner { height: var(--header-h); transform-origin: top center; }
+                    .footer-inner { height: var(--footer-h); transform-origin: bottom center; }
+                    .content-cell { padding: 0 var(--hsafe); }
                     .header {
                         text-align: center;
                         margin-bottom: 40px;
@@ -855,16 +863,23 @@ class AccountingApp {
                         font-size: 14px;
                         color: #7f8c8d;
                     }
+                    /* Ensure container wrappers don't clip content */
+                    #capitalReportTable, .table-responsive { overflow: visible !important; height: auto !important; max-height: none !important; break-inside: auto; page-break-inside: auto; }
                     table {
                         width: 100%;
                         border-collapse: collapse;
-                        margin: 20px 0;
-                        font-size: 14px;
+                        margin: 12px 0 18px 0;
+                        font-size: 12.5px;
+                        table-layout: fixed;
+                        page-break-inside: auto;
                     }
                     th, td {
                         border: 1px solid #333;
                         padding: 12px 8px;
                         text-align: center;
+                        word-wrap: break-word;
+                        white-space: normal;
+                        max-width: 0;
                     }
                     th {
                         background-color: #34495e;
@@ -890,6 +905,8 @@ class AccountingApp {
                         border: 2px solid #333;
                         border-radius: 10px;
                         background-color: #f8f9fa;
+                        page-break-inside: avoid;
+                        box-shadow: none;
                     }
                     .summary-title {
                         font-size: 18px;
@@ -909,6 +926,7 @@ class AccountingApp {
                         border: 1px solid #ddd;
                         border-radius: 8px;
                         background: white;
+                        box-shadow: none;
                     }
                     .summary-label {
                         font-size: 14px;
@@ -921,42 +939,70 @@ class AccountingApp {
                         color: #2c3e50;
                     }
                     @media print {
-                        body { margin: 10px; }
-                        .no-print { display: none; }
-                        table { page-break-inside: auto; }
-                        tr { page-break-inside: avoid; page-break-after: auto; }
+                        html, body { width: 100%; height: auto; overflow: visible; }
+                        body { padding: 0; }
+                        #capitalReportTable { overflow: visible !important; }
+                        table { page-break-inside: auto; break-inside: auto; }
+                        .summary-grid { gap: 12px; }
+                        th, td { padding: 7px 5px; font-size: 12.5px; }
+                        .summary-section { margin: 10px 0 18px; padding: 10px 12px; page-break-inside: avoid; }
                     }
                 </style>
             </head>
             <body>
-                ${headerHTML}
-
-                <div class="summary-section">
-                    <div class="summary-title">ملخص التقرير</div>
-                    <div class="summary-grid">
-                        <div class="summary-item">
-                            <div class="summary-label">إجمالي الدولار</div>
-                            <div class="summary-value text-success">${totalUSD}</div>
-                        </div>
-                        <div class="summary-item">
-                            <div class="summary-label">إجمالي الدينار</div>
-                            <div class="summary-value text-primary">${totalIQD}</div>
-                        </div>
-                        <div class="summary-item">
-                            <div class="summary-label">عدد الإدخالات</div>
-                            <div class="summary-value">${totalEntries}</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div style="margin: 30px 0;">
-                    ${tableContent.innerHTML}
-                </div>
-
-                <div style="margin-top: 50px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #ddd; padding-top: 20px;">
-                    تم إنشاء هذا التقرير بواسطة نظام المحاسبة الإلكتروني - شركة المقاولات المتقدمة
-                </div>
-                ${buildPrintFooterHTML ? buildPrintFooterHTML() : ''}
+                <table class="print-frame">
+                    <thead>
+                        <tr>
+                            <td>
+                                <div class="header-box">
+                                    <div class="header-inner">${headerHTML}</div>
+                                </div>
+                            </td>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="content-cell">
+                                <div class="print-inner">
+                                    <div class="summary-section">
+                                        <div class="summary-title">ملخص التقرير</div>
+                                        <div class="summary-grid">
+                                            <div class="summary-item">
+                                                <div class="summary-label">إجمالي الدولار</div>
+                                                <div class="summary-value text-success">${totalUSD}</div>
+                                            </div>
+                                            <div class="summary-item">
+                                                <div class="summary-label">إجمالي الدينار</div>
+                                                <div class="summary-value text-primary">${totalIQD}</div>
+                                            </div>
+                                            <div class="summary-item">
+                                                <div class="summary-label">عدد الإدخالات</div>
+                                                <div class="summary-value">${totalEntries}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        ${tableContent.innerHTML}
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td>
+                                <div class="footer-box">
+                                    <div class="footer-inner">
+                                        <div style="text-align: center; font-size: 12px; color: #666; border-top: 1px solid #ddd; padding: 6px 12px; background: transparent;">
+                                            تم إنشاء هذا التقرير بواسطة نظام المحاسبة الإلكتروني - شركة المقاولات المتقدمة
+                                        </div>
+                                        ${buildPrintFooterHTML ? buildPrintFooterHTML() : ''}
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
             </body>
             </html>
         `;
@@ -964,9 +1010,28 @@ class AccountingApp {
         printWindow.document.write(printHTML);
         printWindow.document.close();
         printWindow.onload = () => {
-            setTimeout(() => {
-                try { printWindow.print(); } catch (e) { console.error('Print failed', e); }
-            }, 300);
+            try {
+                const doc = printWindow.document;
+                const headerInner = doc.querySelector('.header-inner');
+                const footerInner = doc.querySelector('.footer-inner');
+                const targetHeaderPx = 3 * (96/2.54);
+                const targetFooterPx = 3 * (96/2.54);
+                if (headerInner) {
+                    const r = headerInner.getBoundingClientRect();
+                    if (r.height > targetHeaderPx) {
+                        const s = Math.max(0.8, targetHeaderPx / r.height);
+                        headerInner.style.transform = `scale(${s})`;
+                    }
+                }
+                if (footerInner) {
+                    const r = footerInner.getBoundingClientRect();
+                    if (r.height > targetFooterPx) {
+                        const s = Math.max(0.8, targetFooterPx / r.height);
+                        footerInner.style.transform = `scale(${s})`;
+                    }
+                }
+            } catch (e) {}
+            setTimeout(() => { try { printWindow.print(); } catch (e) {} }, 300);
         };
     }
 
