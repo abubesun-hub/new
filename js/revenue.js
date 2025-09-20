@@ -200,6 +200,7 @@ class RevenueManager {
                         <button class="btn btn-outline-success btn-sm" id="advSearchBtn"><i class="bi bi-search me-1"></i>بحث</button>
                         <button class="btn btn-outline-primary btn-sm" id="advPrintAllBtn"><i class="bi bi-printer me-1"></i>طباعة كافة النتائج</button>
                         <button class="btn btn-outline-dark btn-sm" id="advExportAllBtn"><i class="bi bi-download me-1"></i>تصدير كافة النتائج</button>
+                        <button class="btn btn-outline-success btn-sm" id="advExportAllExcelBtn"><i class="bi bi-file-earmark-excel me-1"></i>تصدير Excel</button>
                     </div>
                 </div>
                 <div class="card-body">
@@ -317,11 +318,13 @@ class RevenueManager {
         const btnSearch = document.getElementById('advSearchBtn');
         const btnReset = document.getElementById('advResetBtn');
         const btnPrintAll = document.getElementById('advPrintAllBtn');
-        const btnExportAll = document.getElementById('advExportAllBtn');
+    const btnExportAll = document.getElementById('advExportAllBtn');
+    const btnExportAllExcel = document.getElementById('advExportAllExcelBtn');
         if (btnSearch) btnSearch.addEventListener('click', () => this.performAdvancesSearch());
         if (btnReset) btnReset.addEventListener('click', () => this.resetAdvancesSearch());
         if (btnPrintAll) btnPrintAll.addEventListener('click', () => this.printAllAdvances());
         if (btnExportAll) btnExportAll.addEventListener('click', () => this.exportAllAdvances());
+    if (btnExportAllExcel) btnExportAllExcel.addEventListener('click', () => this.exportAllAdvancesExcel());
 
         // initial fill
         // ensure default filters show all results
@@ -483,6 +486,7 @@ class RevenueManager {
                         <button class="btn btn-outline-secondary" data-action="edit" data-id="${r.id}"><i class="bi bi-pencil"></i></button>
                         <button class="btn btn-outline-primary" data-action="print" data-id="${r.id}"><i class="bi bi-printer"></i></button>
                         <button class="btn btn-outline-dark" data-action="export" data-id="${r.id}"><i class="bi bi-download"></i></button>
+                        <button class="btn btn-outline-success" data-action="export-xls" data-id="${r.id}"><i class="bi bi-file-earmark-excel"></i></button>
                     </div>
                 </td>
             </tr>
@@ -495,6 +499,7 @@ class RevenueManager {
             if (action === 'edit') btn.addEventListener('click', () => this.openAdvanceEdit(id));
             if (action === 'print') btn.addEventListener('click', () => this.printAdvance(id));
             if (action === 'export') btn.addEventListener('click', () => this.exportAdvance(id));
+            if (action === 'export-xls') btn.addEventListener('click', () => this.exportAdvanceExcel(id));
         });
     }
 
@@ -655,6 +660,79 @@ class RevenueManager {
             this.notify('فشل التصدير', 'danger');
         }
     }
+
+        // -------- Excel Export (Arabic-friendly) --------
+        buildAdvancesTableHTML(list) {
+                const rows = (list||[]).map(r => `
+                    <tr>
+                        <td>${r.registrationNumber || ''}</td>
+                        <td>${this.formatDate(r.date) || ''}</td>
+                        <td>${r.currency || ''}</td>
+                        <td>${(r.amount!=null)? r.amount : ''}</td>
+                        <td>${r.receiptNumber || ''}</td>
+                        <td>${r.grantor || ''}</td>
+                        <td>${(r.type||'income')==='refund'?'تسوية/إرجاع':'سلفة'}</td>
+                        <td>${r.notes || ''}</td>
+                    </tr>
+                `).join('');
+                return `
+                    <table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse; font-family:Arial, 'Segoe UI', Tahoma;">
+                        <thead style="background:#e9ecef; font-weight:bold;">
+                            <tr>
+                                <th>رقم القيد</th>
+                                <th>التاريخ</th>
+                                <th>العملة</th>
+                                <th>المبلغ</th>
+                                <th>الإيصال/السند</th>
+                                <th>الجهة المانحة</th>
+                                <th>نوع العملية</th>
+                                <th>وصف</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows || '<tr><td colspan="8">لا توجد بيانات</td></tr>'}</tbody>
+                    </table>`;
+        }
+
+        exportAllAdvancesExcel() {
+                const list = this.advLastResults && this.advLastResults.length ? this.advLastResults : this.getAllAdvances();
+                const tableHTML = this.buildAdvancesTableHTML(list);
+                const html = `<!DOCTYPE html>
+                    <html lang="ar" dir="rtl">
+                    <head><meta charset="utf-8">
+                        <meta http-equiv="Content-Type" content="application/vnd.ms-excel; charset=utf-8"/>
+                        <title>قائمة السلف</title>
+                    </head>
+                    <body dir="rtl">${tableHTML}</body></html>`;
+                this.downloadExcel(html, `advances_${new Date().toISOString().split('T')[0]}.xls`);
+        }
+
+        exportAdvanceExcel(id) {
+                const list = this.getAllAdvances();
+                const r = list.find(x => x.id === id);
+                if (!r) return this.notify('القيد غير موجود', 'danger');
+                const tableHTML = this.buildAdvancesTableHTML([r]);
+                const html = `<!DOCTYPE html>
+                    <html lang="ar" dir="rtl">
+                    <head><meta charset="utf-8">
+                        <meta http-equiv="Content-Type" content="application/vnd.ms-excel; charset=utf-8"/>
+                        <title>سند سلفة</title>
+                    </head>
+                    <body dir="rtl">${tableHTML}</body></html>`;
+                this.downloadExcel(html, `advance_${r.registrationNumber || r.id}.xls`);
+        }
+
+        downloadExcel(html, filename) {
+                try {
+                        const blob = new Blob(['\uFEFF', html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url; a.download = filename; a.click();
+                        setTimeout(() => URL.revokeObjectURL(url), 1000);
+                } catch (e) {
+                        console.error(e);
+                        this.notify('فشل التصدير إلى Excel', 'danger');
+                }
+        }
 
     formatCurrency(amount, currency) {
         const num = parseFloat(amount) || 0;
