@@ -3,6 +3,7 @@ class StorageManager {
     static STORAGE_KEYS = {
         CAPITAL: 'accounting_capital',
         EXPENSES: 'accounting_expenses',
+        REVENUE: 'accounting_revenue',
         SHAREHOLDERS: 'accounting_shareholders',
         USERS: 'accounting_users',
         SETTINGS: 'accounting_settings',
@@ -106,6 +107,10 @@ class StorageManager {
         
         if (!this.getData(this.STORAGE_KEYS.CAPITAL)) {
             this.saveData(this.STORAGE_KEYS.CAPITAL, []);
+        }
+        
+        if (!this.getData(this.STORAGE_KEYS.REVENUE)) {
+            this.saveData(this.STORAGE_KEYS.REVENUE, []);
         }
         
         if (!this.getData(this.STORAGE_KEYS.EXPENSES)) {
@@ -216,6 +221,7 @@ class StorageManager {
         return {
             shareholders: this.getData(this.STORAGE_KEYS.SHAREHOLDERS) || [],
             capital: this.getData(this.STORAGE_KEYS.CAPITAL) || [],
+            revenue: this.getData(this.STORAGE_KEYS.REVENUE) || [],
             expenses: this.getData(this.STORAGE_KEYS.EXPENSES) || [],
             users: this.getData(this.STORAGE_KEYS.USERS) || [],
             settings: this.getData(this.STORAGE_KEYS.SETTINGS) || {},
@@ -231,6 +237,7 @@ class StorageManager {
         if(!all || typeof all !== 'object') return false;
         if('shareholders' in all) this.saveData(this.STORAGE_KEYS.SHAREHOLDERS, all.shareholders);
         if('capital' in all) this.saveData(this.STORAGE_KEYS.CAPITAL, all.capital);
+        if('revenue' in all) this.saveData(this.STORAGE_KEYS.REVENUE, all.revenue);
         if('expenses' in all) this.saveData(this.STORAGE_KEYS.EXPENSES, all.expenses);
         if('users' in all) this.saveData(this.STORAGE_KEYS.USERS, all.users);
         if('settings' in all) this.saveData(this.STORAGE_KEYS.SETTINGS, all.settings);
@@ -357,6 +364,45 @@ class StorageManager {
     const ok = this.saveData(this.STORAGE_KEYS.EXPENSES, filteredExpenses);
     if (ok) this.notifyDataChanged('expenses:delete');
     return ok;
+    }
+
+    // Revenue entries management
+    static addRevenueEntry(revenueData) {
+        const revenue = this.getData(this.STORAGE_KEYS.REVENUE) || [];
+        const newEntry = {
+            id: this.generateId(),
+            registrationNumber: this.generateRegistrationNumber(),
+            // default to income; allow 'refund' to represent negative revenue
+            type: (revenueData && revenueData.type) ? revenueData.type : 'income',
+            ...revenueData,
+            createdAt: new Date().toISOString()
+        };
+        revenue.push(newEntry);
+        if (this.saveData(this.STORAGE_KEYS.REVENUE, revenue)) {
+            this.notifyDataChanged('revenue:add');
+            return newEntry;
+        }
+        return null;
+    }
+
+    static updateRevenueEntry(id, updateData) {
+        const revenue = this.getData(this.STORAGE_KEYS.REVENUE) || [];
+        const index = revenue.findIndex(r => r.id === id);
+        if (index !== -1) {
+            revenue[index] = { ...revenue[index], ...updateData, updatedAt: new Date().toISOString() };
+            const ok = this.saveData(this.STORAGE_KEYS.REVENUE, revenue);
+            if (ok) this.notifyDataChanged('revenue:update');
+            return ok;
+        }
+        return false;
+    }
+
+    static deleteRevenueEntry(id) {
+        const revenue = this.getData(this.STORAGE_KEYS.REVENUE) || [];
+        const filtered = revenue.filter(r => r.id !== id);
+        const ok = this.saveData(this.STORAGE_KEYS.REVENUE, filtered);
+        if (ok) this.notifyDataChanged('revenue:delete');
+        return ok;
     }
 
     // Accounting Guide Management

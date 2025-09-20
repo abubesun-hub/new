@@ -110,13 +110,24 @@ class DashboardManager {
             stats.transactions += data.expenses.length;
         }
 
-        // Calculate remaining amounts (Capital - Expenses)
-        stats.remaining.USD = stats.capital.USD - stats.expenses.USD;
-        stats.remaining.IQD = stats.capital.IQD - stats.expenses.IQD;
+            // Calculate revenue totals from dedicated revenue storage
+            if (data.revenue) {
+                data.revenue.forEach(entry => {
+                    const raw = parseFloat(entry.amount) || 0;
+                    const isRefund = (entry.type || '').toLowerCase() === 'refund';
+                    const amount = isRefund ? -Math.abs(raw) : Math.abs(raw);
+                    if (entry.currency === 'USD') {
+                        stats.revenue.USD += amount;
+                    } else if (entry.currency === 'IQD') {
+                        stats.revenue.IQD += amount;
+                    }
+                });
+                stats.transactions += data.revenue.length;
+            }
 
-        // For now, revenue equals capital (can be extended later)
-        stats.revenue.USD = stats.capital.USD;
-        stats.revenue.IQD = stats.capital.IQD;
+        // Calculate remaining amounts (Cash box): Capital + Revenue - Expenses
+        stats.remaining.USD = (stats.capital.USD + stats.revenue.USD) - stats.expenses.USD;
+        stats.remaining.IQD = (stats.capital.IQD + stats.revenue.IQD) - stats.expenses.IQD;
 
         // Calculate profit margin
         if (stats.revenue.USD > 0) {
@@ -137,12 +148,13 @@ class DashboardManager {
         let currentMonthTotal = 0;
         let lastMonthTotal = 0;
 
-        if (data.capital) {
-            data.capital.forEach(entry => {
+        // Base growth on revenue entries
+        if (data.revenue) {
+            data.revenue.forEach(entry => {
                 const entryDate = new Date(entry.date);
                 const raw = parseFloat(entry.amount) || 0;
-                const isWithdrawal = (entry.type || '').toLowerCase() === 'withdrawal';
-                const amount = isWithdrawal ? -Math.abs(raw) : Math.abs(raw);
+                const isRefund = (entry.type || '').toLowerCase() === 'refund';
+                const amount = isRefund ? -Math.abs(raw) : Math.abs(raw);
                 if (entryDate.getMonth() === currentMonth) {
                     currentMonthTotal += amount;
                 } else if (entryDate.getMonth() === lastMonth) {
@@ -160,11 +172,15 @@ class DashboardManager {
         // Update main statistics
         this.updateElement('totalUSD', this.formatCurrency(stats.remaining.USD, 'USD'));
         this.updateElement('totalIQD', this.formatCurrency(stats.remaining.IQD, 'IQD'));
-        this.updateElement('totalRevenue', this.formatCurrency(stats.revenue.USD, 'USD'));
-    // New IQD revenue card (sum of capital in IQD)
-    this.updateElement('totalRevenueIQD', this.formatCurrency(stats.revenue.IQD, 'IQD'));
-    // New IQD expenses card (sum of expenses in IQD)
-    this.updateElement('totalExpensesIQD', this.formatCurrency(stats.expenses.IQD, 'IQD'));
+
+        // Show total inflows (Capital + Revenue) on the "إجمالي الإيرادات" cards as requested
+        const inflowsUSD = (stats.capital?.USD || 0) + (stats.revenue?.USD || 0);
+        const inflowsIQD = (stats.capital?.IQD || 0) + (stats.revenue?.IQD || 0);
+        this.updateElement('totalRevenue', this.formatCurrency(inflowsUSD, 'USD'));
+        this.updateElement('totalRevenueIQD', this.formatCurrency(inflowsIQD, 'IQD'));
+
+        // Expenses totals
+        this.updateElement('totalExpensesIQD', this.formatCurrency(stats.expenses.IQD, 'IQD'));
         this.updateElement('totalExpenses', this.formatCurrency(stats.expenses.USD, 'USD'));
 
         // Update additional statistics if elements exist
@@ -216,6 +232,18 @@ class DashboardManager {
             );
         }
 
+            if (data.revenue) {
+                allTransactions = allTransactions.concat(
+                    data.revenue.map(t => ({ 
+                        ...t, 
+                        type: 'إيراد',
+                        revenueType: t.type,
+                        typeClass: (t.type || '').toLowerCase() === 'refund' ? 'secondary' : 'primary',
+                        icon: 'graph-up'
+                    }))
+                );
+            }
+
         // Sort by date (most recent first)
         allTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
 
@@ -265,10 +293,21 @@ class DashboardManager {
                                 <td class="fw-bold">${(() => {
                                     const hasUSD = transaction.amountUSD !== undefined;
                                     const hasIQD = transaction.amountIQD !== undefined;
-                                    const rawAmt = hasUSD ? parseFloat(transaction.amountUSD) || 0 : (hasIQD ? parseFloat(transaction.amountIQD) || 0 : (parseFloat(transaction.amount) || 0));
+                                    const rawAmt = hasUSD ? (parseFloat(transaction.amountUSD) || 0) : (hasIQD ? (parseFloat(transaction.amountIQD) || 0) : (parseFloat(transaction.amount) || 0));
                                     const curr = hasUSD ? 'USD' : (hasIQD ? 'IQD' : transaction.currency);
-                                    const isWithdrawal = (transaction.capitalType || '').toLowerCase() === 'withdrawal';
-                                    const signed = isWithdrawal ? -Math.abs(rawAmt) : rawAmt;
+                                    // Determine sign by type
+                                    let sign = 1;
+                                    const t = (transaction.type || '').trim();
+                                    if (t === 'رأس مال') {
+                                        const isWithdrawal = (transaction.capitalType || '').toLowerCase() === 'withdrawal';
+                                        if (isWithdrawal) sign = -1;
+                                    } else if (t === 'إيراد') {
+                                        const isRefund = (transaction.revenueType || '').toLowerCase() === 'refund';
+                                        if (isRefund) sign = -1;
+                                    } else if (t === 'مصروف') {
+                                        sign = -1;
+                                    }
+                                    const signed = sign * Math.abs(rawAmt);
                                     return this.formatCurrency(signed, curr);
                                 })()}</td>
                                 <td>
@@ -507,6 +546,12 @@ class DashboardManager {
                 data.expenses.map(t => ({ ...t, type: 'expense' }))
             );
         }
+
+            if (data.revenue) {
+                allTransactions = allTransactions.concat(
+                    data.revenue.map(t => ({ ...t, type: 'revenue' }))
+                );
+            }
 
         return allTransactions
             .sort((a, b) => new Date(b.date) - new Date(a.date))
