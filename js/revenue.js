@@ -249,6 +249,8 @@ class RevenueManager {
                             </tbody>
                         </table>
                     </div>
+                    <!-- Totals card below the table -->
+                    <div id="advancesTotals" class="mt-3"></div>
                 </div>
             </div>
 
@@ -470,6 +472,7 @@ class RevenueManager {
         if (!tbody) return;
         if (!list || list.length === 0) {
             tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">لا توجد نتائج مطابقة</td></tr>';
+            this.renderAdvancesTotals([]);
             return;
         }
         tbody.innerHTML = list.map(r => `
@@ -501,6 +504,89 @@ class RevenueManager {
             if (action === 'export') btn.addEventListener('click', () => this.exportAdvance(id));
             if (action === 'export-xls') btn.addEventListener('click', () => this.exportAdvanceExcel(id));
         });
+
+        // render totals under table
+        this.renderAdvancesTotals(list);
+    }
+
+    renderAdvancesTotals(list) {
+        const container = document.getElementById('advancesTotals');
+        if (!container) return;
+        let totalUSD = 0, totalIQD = 0;
+        (list || []).forEach(r => {
+            const amt = parseFloat(r.amount) || 0;
+            const sign = ((r.type || 'income').toLowerCase() === 'refund') ? -1 : 1;
+            if (r.currency === 'USD') totalUSD += sign * amt;
+            if (r.currency === 'IQD') totalIQD += sign * amt;
+        });
+        const usdText = this.formatCurrency(totalUSD, 'USD');
+        const iqdText = this.formatCurrency(totalIQD, 'IQD');
+        container.innerHTML = `
+            <div class="neumorphic-card p-3">
+                <div class="row g-3 align-items-stretch">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center h-100 p-3" style="background:#f8f9fa; border-radius:10px;">
+                            <div class="stat-icon" style="background: linear-gradient(90deg,#4dabf7,#1971c2); width:42px; height:42px; display:flex; align-items:center; justify-content:center; border-radius:10px; color:#fff;">
+                                <i class="bi bi-currency-dollar"></i>
+                            </div>
+                            <div class="ms-3">
+                                <div class="text-muted small">إجمالي دينار/دولار - USD</div>
+                                <div class="fw-bold fs-5">${usdText}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center h-100 p-3" style="background:#f8f9fa; border-radius:10px;">
+                            <div class="stat-icon" style="background: linear-gradient(90deg,#ffb02e,#ff8a00); width:42px; height:42px; display:flex; align-items:center; justify-content:center; border-radius:10px; color:#fff;">
+                                <i class="bi bi-cash"></i>
+                            </div>
+                            <div class="ms-3">
+                                <div class="text-muted small">إجمالي دينار/دولار - IQD</div>
+                                <div class="fw-bold fs-5">${iqdText}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+    }
+
+    // Reusable totals computation
+    computeAdvancesTotals(list) {
+        let totalUSD = 0, totalIQD = 0;
+        (list || []).forEach(r => {
+            const amt = parseFloat(r.amount) || 0;
+            const sign = ((r.type || 'income').toLowerCase() === 'refund') ? -1 : 1;
+            if (r.currency === 'USD') totalUSD += sign * amt;
+            if (r.currency === 'IQD') totalIQD += sign * amt;
+        });
+        return { USD: totalUSD, IQD: totalIQD };
+    }
+
+    // Totals block for print engine (styled similarly to other print sections)
+    buildTotalsSectionHTML(totals, title = 'الإجمالي') {
+        const usd = this.formatCurrency(totals.USD || 0, 'USD');
+        const iqd = this.formatCurrency(totals.IQD || 0, 'IQD');
+        return `
+            <div class="summary-section" style="margin-top:16px;">
+                <div class="summary-title">${title}</div>
+                <table>
+                    <tbody>
+                        <tr><th>USD</th><td>${usd}</td><th>IQD</th><td>${iqd}</td></tr>
+                    </tbody>
+                </table>
+            </div>`;
+    }
+
+    // Totals table for Excel HTML export
+    buildTotalsExcelTableHTML(totals, title = 'الإجمالي') {
+        const usd = this.formatCurrency(totals.USD || 0, 'USD');
+        const iqd = this.formatCurrency(totals.IQD || 0, 'IQD');
+        return `
+            <div style="font-weight:bold; margin-top:10px;">${title}</div>
+            <table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse; font-family:Arial, 'Segoe UI', Tahoma; margin-top:4px;">
+                <thead style="background:#e9ecef; font-weight:bold;"><tr><th>USD</th><th>IQD</th></tr></thead>
+                <tbody><tr><td>${usd}</td><td>${iqd}</td></tr></tbody>
+            </table>`;
     }
 
     openAdvanceEdit(id) {
@@ -580,11 +666,13 @@ class RevenueManager {
         const r = list.find(x => x.id === id);
         if (!r) return this.notify('القيد غير موجود', 'danger');
         if (window.PrintEngine && typeof PrintEngine.render === 'function') {
+            const totals = this.computeAdvancesTotals([r]);
+            const body = this.buildAdvanceInvoiceBody(r) + this.buildTotalsSectionHTML(totals, 'الإجمالي');
             const html = PrintEngine.render({
                 title: 'سند سلفة / Receipt',
                 headerHTML: (typeof buildBrandedHeaderHTML==='function') ? buildBrandedHeaderHTML('سند سلفة / Receipt') : '',
                 footerHTML: (typeof buildPrintFooterHTML==='function') ? buildPrintFooterHTML() : '',
-                bodyHTML: this.buildAdvanceInvoiceBody(r),
+                bodyHTML: body,
                 orientation: 'landscape'
             });
             return PrintEngine.print(html);
@@ -616,19 +704,22 @@ class RevenueManager {
                                 <td>${r.notes || '-'}</td>
                         </tr>`).join('');
                 if (window.PrintEngine && typeof PrintEngine.render === 'function') {
-                        const bodyHTML = `
+            const totals = this.computeAdvancesTotals(list);
+            const totalsHTML = this.buildTotalsSectionHTML(totals, 'الإجمالي (نتائج البحث)');
+            const bodyHTML = `
                             <div class="summary-section">
                                 <div class="summary-title">قائمة السلف</div>
                                 <table>
                                     <thead><tr><th>رقم القيد</th><th>التاريخ</th><th>العملة</th><th>المبلغ</th><th>الإيصال/السند</th><th>الجهة المانحة</th><th>الوصف</th></tr></thead>
                                     <tbody>${rows || '<tr><td colspan="7" class="text-center">لا توجد بيانات</td></tr>'}</tbody>
-                                </table>
+                </table>
                             </div>`;
+            const fullBody = bodyHTML + totalsHTML;
                         const html = PrintEngine.render({
                                 title: 'قائمة السلف',
                                 headerHTML: (typeof buildBrandedHeaderHTML==='function') ? buildBrandedHeaderHTML('قائمة السلف') : '',
                                 footerHTML: (typeof buildPrintFooterHTML==='function') ? buildPrintFooterHTML() : '',
-                                bodyHTML,
+                bodyHTML: fullBody,
                                 orientation: 'landscape'
                         });
                         return PrintEngine.print(html);
@@ -642,7 +733,14 @@ class RevenueManager {
 
     exportAllAdvances() {
         const list = this.advLastResults && this.advLastResults.length ? this.advLastResults : this.getAllAdvances();
-        this.downloadJSON(list, `advances_${new Date().toISOString().split('T')[0]}.json`);
+        // Include totals in the JSON export for completeness
+        const totals = this.computeAdvancesTotals(list);
+        const payload = {
+            exportedAt: new Date().toISOString(),
+            totals,
+            items: list
+        };
+        this.downloadJSON(payload, `advances_${new Date().toISOString().split('T')[0]}.json`);
     }
 
     downloadJSON(obj, filename) {
@@ -698,13 +796,15 @@ class RevenueManager {
                 const tableHTML = this.buildAdvancesTableHTML(list);
                 const exportDate = new Date().toLocaleDateString('ar-IQ', { year: 'numeric', month: 'long', day: 'numeric' });
                 const titleHTML = `<div style="font-weight:bold; font-size:16px; margin-bottom:10px; text-align:center;">السلف لغاية ${exportDate}</div>`;
+                const totals = this.computeAdvancesTotals(list);
+                const totalsTable = this.buildTotalsExcelTableHTML(totals, 'الإجمالي (نتائج البحث)');
                 const html = `<!DOCTYPE html>
                     <html lang="ar" dir="rtl">
                     <head><meta charset="utf-8">
                         <meta http-equiv="Content-Type" content="application/vnd.ms-excel; charset=utf-8"/>
                         <title>قائمة السلف</title>
                     </head>
-                    <body dir="rtl">${titleHTML}${tableHTML}</body></html>`;
+                    <body dir="rtl">${titleHTML}${tableHTML}${totalsTable}</body></html>`;
                 this.downloadExcel(html, `advances_${new Date().toISOString().split('T')[0]}.xls`);
         }
 
@@ -715,13 +815,15 @@ class RevenueManager {
                 const tableHTML = this.buildAdvancesTableHTML([r]);
                 const exportDate = new Date().toLocaleDateString('ar-IQ', { year: 'numeric', month: 'long', day: 'numeric' });
                 const titleHTML = `<div style="font-weight:bold; font-size:16px; margin-bottom:10px; text-align:center;">السلف لغاية ${exportDate}</div>`;
+                const totals = this.computeAdvancesTotals([r]);
+                const totalsTable = this.buildTotalsExcelTableHTML(totals, 'الإجمالي');
                 const html = `<!DOCTYPE html>
                     <html lang="ar" dir="rtl">
                     <head><meta charset="utf-8">
                         <meta http-equiv="Content-Type" content="application/vnd.ms-excel; charset=utf-8"/>
                         <title>سند سلفة</title>
                     </head>
-                    <body dir="rtl">${titleHTML}${tableHTML}</body></html>`;
+                    <body dir="rtl">${titleHTML}${tableHTML}${totalsTable}</body></html>`;
                 this.downloadExcel(html, `advance_${r.registrationNumber || r.id}.xls`);
         }
 
