@@ -696,13 +696,15 @@ class RevenueManager {
         exportAllAdvancesExcel() {
                 const list = this.advLastResults && this.advLastResults.length ? this.advLastResults : this.getAllAdvances();
                 const tableHTML = this.buildAdvancesTableHTML(list);
+                const exportDate = new Date().toLocaleDateString('ar-IQ', { year: 'numeric', month: 'long', day: 'numeric' });
+                const titleHTML = `<div style="font-weight:bold; font-size:16px; margin-bottom:10px; text-align:center;">السلف لغاية ${exportDate}</div>`;
                 const html = `<!DOCTYPE html>
                     <html lang="ar" dir="rtl">
                     <head><meta charset="utf-8">
                         <meta http-equiv="Content-Type" content="application/vnd.ms-excel; charset=utf-8"/>
                         <title>قائمة السلف</title>
                     </head>
-                    <body dir="rtl">${tableHTML}</body></html>`;
+                    <body dir="rtl">${titleHTML}${tableHTML}</body></html>`;
                 this.downloadExcel(html, `advances_${new Date().toISOString().split('T')[0]}.xls`);
         }
 
@@ -711,13 +713,15 @@ class RevenueManager {
                 const r = list.find(x => x.id === id);
                 if (!r) return this.notify('القيد غير موجود', 'danger');
                 const tableHTML = this.buildAdvancesTableHTML([r]);
+                const exportDate = new Date().toLocaleDateString('ar-IQ', { year: 'numeric', month: 'long', day: 'numeric' });
+                const titleHTML = `<div style="font-weight:bold; font-size:16px; margin-bottom:10px; text-align:center;">السلف لغاية ${exportDate}</div>`;
                 const html = `<!DOCTYPE html>
                     <html lang="ar" dir="rtl">
                     <head><meta charset="utf-8">
                         <meta http-equiv="Content-Type" content="application/vnd.ms-excel; charset=utf-8"/>
                         <title>سند سلفة</title>
                     </head>
-                    <body dir="rtl">${tableHTML}</body></html>`;
+                    <body dir="rtl">${titleHTML}${tableHTML}</body></html>`;
                 this.downloadExcel(html, `advance_${r.registrationNumber || r.id}.xls`);
         }
 
