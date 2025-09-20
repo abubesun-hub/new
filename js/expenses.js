@@ -3668,6 +3668,8 @@ class ExpensesManager {
                             // اربط اختيار المساهم بتعبئة حقل المستفيد تلقائياً
                             const beneficiaryInput = document.getElementById('expenseBeneficiary');
                             if (beneficiaryInput) {
+                                // اجعل الحقل للقراءة فقط لضمان التوافق
+                                beneficiaryInput.readOnly = true;
                                 // املأ المستفيد فوراً إذا كان هناك اختيار حالي
                                 const selOpt = shareholderSelect.options[shareholderSelect.selectedIndex];
                                 const selName = selOpt && selOpt.value ? selOpt.text : '';
@@ -3682,6 +3684,9 @@ class ExpensesManager {
                     } else {
                         if (shareholderRow) shareholderRow.style.display = 'none';
                         if (shareholderSelect) { shareholderSelect.required = false; shareholderSelect.value = ''; }
+                        // أعد تمكين تحرير المستفيد عند عدم اختيار 5107
+                        const beneficiaryInput = document.getElementById('expenseBeneficiary');
+                        if (beneficiaryInput) beneficiaryInput.readOnly = false;
                     }
                 } catch(err) { console.warn('shareholder toggle err', err); }
             });
@@ -3932,6 +3937,18 @@ class ExpensesManager {
         };
         const paymentMethodArabic = paymentMethods[entry.paymentMethod] || entry.paymentMethod || 'غير محدد';
 
+        // Derive primary currency/amount for display using available fields
+        const amountIQD = parseFloat(entry.amountIQD || 0) || 0;
+        const amountUSD = parseFloat(entry.amountUSD || 0) || 0;
+        const exchangeRate = parseFloat(entry.exchangeRate || 1500) || 1500;
+        const primaryCurrency = (typeof this.determinePrimaryCurrency === 'function')
+            ? this.determinePrimaryCurrency(amountIQD, amountUSD, exchangeRate)
+            : (entry.currency || (amountUSD > 0 ? 'USD' : 'IQD'));
+        const primaryAmount = (primaryCurrency === 'USD')
+            ? (amountUSD || parseFloat(entry.amount || 0) || 0)
+            : (amountIQD || parseFloat(entry.amount || 0) || 0);
+        const currencyDisplay = primaryCurrency === 'USD' ? 'دولار أمريكي (USD)' : 'دينار عراقي (IQD)';
+
         return `
         <!DOCTYPE html>
         <html lang="ar" dir="rtl">
@@ -4107,6 +4124,18 @@ class ExpensesManager {
                     </div>
 
                     <div class="info-row">
+                        <span class="info-label">المستفيد:</span>
+                        <span class="info-value">${entry.beneficiary || 'غير محدد'}</span>
+                    </div>
+
+                    ${entry.accountingGuideCode === '5107' ? `
+                    <div class="info-row">
+                        <span class="info-label">المساهم:</span>
+                        <span class="info-value">${entry.shareholderName || 'غير محدد'}</span>
+                    </div>
+                    ` : ''}
+
+                    <div class="info-row">
                         <span class="info-label">رقم الإيصال:</span>
                         <span class="info-value">${entry.receiptNumber || 'غير محدد'}</span>
                     </div>
@@ -4118,14 +4147,14 @@ class ExpensesManager {
 
                     <div class="info-row">
                         <span class="info-label">نوع العملة:</span>
-                        <span class="info-value">${entry.currency === 'USD' ? 'دولار أمريكي (USD)' : 'دينار عراقي (IQD)'}</span>
+                        <span class="info-value">${currencyDisplay}</span>
                     </div>
 
                     <!-- Amount Section -->
                     <div class="amount-section">
                         <div class="amount-label">المبلغ المدفوع</div>
-                        <div class="amount-value">${this.formatCurrency(entry.amount, entry.currency)}</div>
-                        <div class="amount-words">${this.numberToWords(entry.amount, entry.currency)}</div>
+                        <div class="amount-value">${this.formatCurrency(primaryAmount, primaryCurrency)}</div>
+                        <div class="amount-words">${this.numberToWords(primaryAmount, primaryCurrency)}</div>
                     </div>
 
                     <!-- Description Section -->
