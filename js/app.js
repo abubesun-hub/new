@@ -202,6 +202,9 @@ class AccountingApp {
             case 'capital':
                 this.loadCapitalSection();
                 break;
+            case 'revenue':
+                this.loadRevenueSection();
+                break;
             case 'expenses':
                 this.loadExpensesSection();
                 break;
@@ -248,6 +251,22 @@ class AccountingApp {
             window.expensesManager.loadExpensesSection();
         } else {
             console.error('ExpensesManager still not available!');
+        }
+    }
+
+    loadRevenueSection() {
+        console.log('Loading revenue section from app.js...');
+        // Ensure RevenueManager is available
+        if (!window.revenueManager) {
+            try {
+                window.revenueManager = new RevenueManager();
+            } catch (error) {
+                console.error('Error creating RevenueManager:', error);
+                return;
+            }
+        }
+        if (window.revenueManager) {
+            window.revenueManager.loadRevenueSection();
         }
     }
 
