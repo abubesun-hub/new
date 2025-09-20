@@ -2398,6 +2398,16 @@ class ExpensesManager {
                                 ${this.getAccountingGuideOptions()}
                             </select>
                         </div>
+                        <!-- حقل المساهم (يظهر فقط عند اختيار 5107) -->
+                        <div class="col-md-6 mb-3" id="expenseShareholderRow" style="display:none;">
+                            <label for="expenseShareholder" class="form-label">
+                                <i class="bi bi-person-badge me-1"></i>اسم المساهم
+                            </label>
+                            <select class="form-control neumorphic-input" id="expenseShareholder">
+                                <option value="">اختر المساهم</option>
+                            </select>
+                            <div class="form-text text-muted">سيظهر هذا الحقل فقط عند اختيار الحساب 5107: سحب مالي من قبل مساهم</div>
+                        </div>
 
                         <!-- المستفيد ومعلومات الوصل -->
                         <div class="col-md-4 mb-3">
@@ -3619,9 +3629,11 @@ class ExpensesManager {
             this.saveExpenseEntry();
         });
 
-        // Auto-select category when accounting guide changes
+        // Auto-select category when accounting guide changes + toggle حقل المساهم
         const accountingGuideSelect = document.getElementById('expenseAccountingGuide');
         const categorySelect = document.getElementById('expenseCategory');
+        const shareholderRow = document.getElementById('expenseShareholderRow');
+        const shareholderSelect = document.getElementById('expenseShareholder');
         if (accountingGuideSelect && categorySelect){
             accountingGuideSelect.addEventListener('change', () => {
                 const guideId = accountingGuideSelect.value;
@@ -3639,7 +3651,42 @@ class ExpensesManager {
                     categorySelect.appendChild(newOpt);
                 }
                 categorySelect.value = category;
+
+                // Toggle shareholders field when code is 5107
+                try {
+                    const selectedOption = accountingGuideSelect.options[accountingGuideSelect.selectedIndex];
+                    const code = selectedOption?.getAttribute('data-code');
+                    if (code === '5107') {
+                        if (shareholderRow) shareholderRow.style.display = '';
+                        if (shareholderSelect) {
+                            const shareholders = StorageManager.getData(StorageManager.STORAGE_KEYS.SHAREHOLDERS) || [];
+                            const curr = shareholderSelect.value;
+                            shareholderSelect.innerHTML = '<option value="">اختر المساهم</option>' + shareholders.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+                            if (curr) { try { shareholderSelect.value = curr; } catch(e){} }
+                            shareholderSelect.required = true;
+
+                            // اربط اختيار المساهم بتعبئة حقل المستفيد تلقائياً
+                            const beneficiaryInput = document.getElementById('expenseBeneficiary');
+                            if (beneficiaryInput) {
+                                // املأ المستفيد فوراً إذا كان هناك اختيار حالي
+                                const selOpt = shareholderSelect.options[shareholderSelect.selectedIndex];
+                                const selName = selOpt && selOpt.value ? selOpt.text : '';
+                                if (selName) beneficiaryInput.value = selName;
+                                // وحدّثه عند أي تغيير لاحق
+                                shareholderSelect.onchange = function(){
+                                    const opt = shareholderSelect.options[shareholderSelect.selectedIndex];
+                                    beneficiaryInput.value = (opt && opt.value) ? opt.text : '';
+                                };
+                            }
+                        }
+                    } else {
+                        if (shareholderRow) shareholderRow.style.display = 'none';
+                        if (shareholderSelect) { shareholderSelect.required = false; shareholderSelect.value = ''; }
+                    }
+                } catch(err) { console.warn('shareholder toggle err', err); }
             });
+            // initialize toggle on load
+            try { accountingGuideSelect.dispatchEvent(new Event('change')); } catch(e){}
         }
     }
     
@@ -3652,6 +3699,12 @@ class ExpensesManager {
         const selectedOption = accountingGuideSelect.options[accountingGuideSelect.selectedIndex];
         const accountingGuideCode = selectedOption?.getAttribute('data-code') || '';
         const accountingGuideName = selectedOption?.getAttribute('data-name') || '';
+        const shareholderId = document.getElementById('expenseShareholder')?.value || '';
+        let shareholderName = '';
+        if (shareholderId) {
+            const shareholders = StorageManager.getData(StorageManager.STORAGE_KEYS.SHAREHOLDERS) || [];
+            shareholderName = shareholders.find(s=>s.id===shareholderId)?.name || '';
+        }
 
         const expenseData = {
             registrationNumber: formData.registrationNumber,
@@ -3669,6 +3722,8 @@ class ExpensesManager {
             category: formData.category,
             project: formData.project,
             notes: formData.notes,
+            shareholderId,
+            shareholderName,
             // Legacy fields for compatibility - determine primary currency based on larger amount
             currency: this.determinePrimaryCurrency(formData.amountIQD, formData.amountUSD, formData.exchangeRate),
             amount: this.calculatePrimaryAmount(formData.amountIQD, formData.amountUSD, formData.exchangeRate),
@@ -4179,6 +4234,8 @@ class ExpensesManager {
             { id: 'guide003', code: '5103', name: 'الرمل والحصى', category: 'مواد البناء', type: 'مصروف مباشر', description: 'رمل البناء والحصى المختلف', notes: '', createdAt: new Date().toISOString() },
             { id: 'guide004', code: '5104', name: 'الطوب والبلوك', category: 'مواد البناء', type: 'مصروف مباشر', description: 'طوب أحمر وبلوك خرساني', notes: '', createdAt: new Date().toISOString() },
             { id: 'guide005', code: '5105', name: 'البلاط والسيراميك', category: 'مواد البناء', type: 'مصروف مباشر', description: 'بلاط أرضيات وسيراميك جدران', notes: '', createdAt: new Date().toISOString() },
+            // حساب خاص: سحب مالي من قبل مساهم
+            { id: 'guide006x', code: '5107', name: 'سحب مالي من قبل مساهم', category: 'المكتب والإدارة', type: 'مصروف إداري', description: 'صرف مبالغ نقدية للمساهمين تخصم لاحقاً من حصصهم', notes: '', createdAt: new Date().toISOString() },
 
             // العمالة
             { id: 'guide006', code: '5201', name: 'أجور العمال المهرة', category: 'العمالة', type: 'مصروف مباشر', description: 'أجور البنائين والحرفيين المهرة', notes: '', createdAt: new Date().toISOString() },
@@ -4655,6 +4712,7 @@ class ExpensesManager {
                         <tr><td><strong>البيان:</strong></td><td>${formData.description}</td></tr>
                         <tr><td><strong>المستفيد:</strong></td><td>${formData.beneficiary || 'غير محدد'}</td></tr>
                         <tr><td><strong>المورد:</strong></td><td>${formData.vendor || 'غير محدد'}</td></tr>
+                        ${formData.accountingGuideCode==='5107' ? ('<tr><td><strong>المساهم:</strong></td><td>' + (formData.shareholderName || 'غير محدد') + '</td></tr>') : ''}
                     </table>
                 </div>
                 <div class="col-md-6">
@@ -4688,8 +4746,10 @@ class ExpensesManager {
         const amountIQD = parseFloat(document.getElementById('expenseAmountIQD')?.value) || 0;
         const amountUSD = parseFloat(document.getElementById('expenseAmountUSD')?.value) || 0;
         const exchangeRate = parseFloat(document.getElementById('expenseExchangeRate')?.value) || 1500;
-        const description = document.getElementById('expenseDescription')?.value;
-        const accountingGuide = document.getElementById('expenseAccountingGuide')?.value;
+    const description = document.getElementById('expenseDescription')?.value;
+    const accountingGuide = document.getElementById('expenseAccountingGuide')?.value;
+    const selectedAGOption = document.getElementById('expenseAccountingGuide')?.options[document.getElementById('expenseAccountingGuide')?.selectedIndex];
+    const accountingGuideCode = selectedAGOption?.getAttribute('data-code') || '';
         const beneficiary = document.getElementById('expenseBeneficiary')?.value;
         const receiptNumber = document.getElementById('expenseReceiptNumber')?.value;
         const receiptDate = document.getElementById('expenseReceiptDate')?.value;
@@ -4698,6 +4758,12 @@ class ExpensesManager {
         const category = document.getElementById('expenseCategory')?.value;
         const project = document.getElementById('expenseProject')?.value;
         const notes = document.getElementById('expenseNotes')?.value;
+        const shareholderId = document.getElementById('expenseShareholder')?.value || '';
+        let shareholderName = '';
+        if (shareholderId) {
+            const shareholders = StorageManager.getData(StorageManager.STORAGE_KEYS.SHAREHOLDERS) || [];
+            shareholderName = shareholders.find(s=>s.id===shareholderId)?.name || '';
+        }
 
         // Validation
         if (!registrationNumber || !date || !description || !accountingGuide || !category) {
@@ -4707,6 +4773,12 @@ class ExpensesManager {
 
         if (amountIQD === 0 && amountUSD === 0) {
             this.showNotification('يرجى إدخال مبلغ المصروف (بالدينار أو الدولار أو كليهما)', 'error');
+            return null;
+        }
+
+        // Require shareholder when account code is 5107
+        if (accountingGuideCode === '5107' && !shareholderId) {
+            this.showNotification('عند اختيار الحساب 5107 (سحب مالي من قبل مساهم) يجب اختيار اسم المساهم', 'error');
             return null;
         }
 
@@ -4727,6 +4799,7 @@ class ExpensesManager {
             exchangeRate,
             description,
             accountingGuide,
+            accountingGuideCode,
             beneficiary,
             receiptNumber,
             receiptDate,
@@ -4734,7 +4807,9 @@ class ExpensesManager {
             paymentMethod,
             category,
             project,
-            notes
+            notes,
+            shareholderId,
+            shareholderName
         };
     }
 
@@ -5409,6 +5484,11 @@ class ExpensesManager {
                     <th>الدليل المحاسبي</th>
                     <td colspan="3">${accountingCode} - ${accountingName}</td>
                 </tr>
+                ${formData.accountingGuideCode === '5107' ? (
+                '<tr>\n' +
+                    '    <th>المساهم</th>\n' +
+                    '    <td colspan="3">' + (formData.shareholderName || 'غير محدد') + '</td>\n' +
+                '</tr>') : ''}
                 <tr>
                     <th>المستفيد</th>
                     <td>${formData.beneficiary || 'غير محدد'}</td>
