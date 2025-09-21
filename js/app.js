@@ -1551,11 +1551,42 @@ class AccountingApp {
         }
 
         // Compute balances: opening + deposits - withdrawals per currency
-        const rows = Array.from(agg.values()).map(r => ({
+        let rows = Array.from(agg.values()).map(r => ({
             ...r,
             balUSD: (r.openUSD) + (r.depUSD) - (r.withUSD),
             balIQD: (r.openIQD) + (r.depIQD) - (r.withIQD)
         })).sort((a,b) => a.name.localeCompare(b.name, 'ar'));
+
+        // New: Aggregate shareholder debits from expenses (account code 5107) within period
+        try {
+            const allData = StorageManager.getAllData();
+            const expenses = Array.isArray(allData.expenses) ? allData.expenses : [];
+            const debitMap = new Map(); // key: shareholderId -> {usd, iqd}
+            for (const ex of expenses) {
+                if ((ex.accountingGuideCode || '') !== '5107') continue; // only shareholder withdrawals through expenses
+                if (!ex.shareholderId) continue; // must be tied to a shareholder
+                const d = new Date(ex.date);
+                const inPeriod = (!fromDate || d >= fromDate) && (!toDate || d <= toDate);
+                if (!inPeriod) continue;
+                if (!debitMap.has(ex.shareholderId)) debitMap.set(ex.shareholderId, { usd: 0, iqd: 0 });
+                const cur = debitMap.get(ex.shareholderId);
+                cur.usd += parseFloat(ex.amountUSD) || 0;
+                cur.iqd += parseFloat(ex.amountIQD) || 0;
+            }
+            // Merge into rows by shareholderId (fallback by name if id missing)
+            rows = rows.map(r => {
+                const keyId = r.shareholderId;
+                const found = keyId ? debitMap.get(keyId) : null;
+                return {
+                    ...r,
+                    debitUSD: found ? found.usd : 0,
+                    debitIQD: found ? found.iqd : 0
+                };
+            });
+        } catch (_e) {
+            // fail-safe: keep report working even if expenses data structure differs
+            rows = rows.map(r => ({ ...r, debitUSD: 0, debitIQD: 0 }));
+        }
 
         this.renderGeneralCapitalReportTable(rows);
         // Ensure dropdown stays in sync in case shareholders list changed
@@ -1597,18 +1628,20 @@ class AccountingApp {
                 <td>${diff != null ? `<span class="badge ${diffBadgeClass}">${diff.toFixed(2)}</span>` : '<span class="text-muted">—</span>'}</td>
                 <td class="text-success">${this.formatCurrency(r.depIQD,'IQD')}</td>
                 <td class="text-danger">${this.formatCurrency(r.withIQD,'IQD')}</td>
+                <td class="text-warning">${this.formatCurrency(r.debitIQD||0,'IQD')}</td>
                 <td class="text-primary fw-bold">${this.formatCurrency(r.balIQD,'IQD')}</td>
                 <td class="text-success">${this.formatCurrency(r.depUSD,'USD')}</td>
                 <td class="text-danger">${this.formatCurrency(r.withUSD,'USD')}</td>
+                <td class="text-warning">${this.formatCurrency(r.debitUSD||0,'USD')}</td>
                 <td class="text-primary fw-bold">${this.formatCurrency(r.balUSD,'USD')}</td>
             </tr>`;
         }).join('');
 
         // Totals
         const totals = rows.reduce((a,r)=>{
-            a.depUSD += r.depUSD; a.withUSD += r.withUSD; a.balUSD += r.balUSD;
-            a.depIQD += r.depIQD; a.withIQD += r.withIQD; a.balIQD += r.balIQD; return a;
-        }, {depUSD:0,withUSD:0,balUSD:0,depIQD:0,withIQD:0,balIQD:0});
+            a.depUSD += r.depUSD; a.withUSD += r.withUSD; a.balUSD += r.balUSD; a.debitUSD += (r.debitUSD||0);
+            a.depIQD += r.depIQD; a.withIQD += r.withIQD; a.balIQD += r.balIQD; a.debitIQD += (r.debitIQD||0); return a;
+        }, {depUSD:0,withUSD:0,balUSD:0,debitUSD:0,depIQD:0,withIQD:0,balIQD:0,debitIQD:0});
 
         const declaredSum = shareholders.reduce((s,sh)=> sh.ownershipPercent!=null ? s + parseFloat(sh.ownershipPercent) : s,0);
         const declaredAlert = declaredSum>0 ? `<div class="small mt-1 ${(Math.abs(declaredSum-100)<=0.5)?'text-success':'text-warning'}">مجموع النسب المعلنة: ${declaredSum.toFixed(2)}%</div>` : '';
@@ -1623,9 +1656,11 @@ class AccountingApp {
                         <th>الفرق (نقاط)</th>
                         <th>المبلغ المودع د.ع</th>
                         <th>المبلغ المسحوب د.ع</th>
+                        <th>مدين- دينار</th>
                         <th>رصيده د.ع</th>
                         <th>المبلغ المودع دولار</th>
                         <th>المبلغ المسحوب دولار</th>
+                        <th>مدين - دولار</th>
                         <th>رصيده دولار</th>
                     </tr>
                 </thead>
@@ -1635,9 +1670,11 @@ class AccountingApp {
                         <td colspan="5" class="text-center">الإجمالي</td>
                         <td>${this.formatCurrency(totals.depIQD,'IQD')}</td>
                         <td>${this.formatCurrency(totals.withIQD,'IQD')}</td>
+                        <td>${this.formatCurrency(totals.debitIQD,'IQD')}</td>
                         <td>${this.formatCurrency(totals.balIQD,'IQD')}</td>
                         <td>${this.formatCurrency(totals.depUSD,'USD')}</td>
                         <td>${this.formatCurrency(totals.withUSD,'USD')}</td>
+                        <td>${this.formatCurrency(totals.debitUSD,'USD')}</td>
                         <td>${this.formatCurrency(totals.balUSD,'USD')}</td>
                     </tr>
                 </tfoot>
@@ -1711,15 +1748,31 @@ class AccountingApp {
             const name = shMap.get(e.shareholderId) || 'غير محدد';
             if (criteria?.name && !name.toLowerCase().includes(criteria.name)) continue;
             const key = e.shareholderId || name;
-            if (!agg.has(key)) agg.set(key,{name,openUSD:0,openIQD:0,depUSD:0,depIQD:0,withUSD:0,withIQD:0});
+            if (!agg.has(key)) agg.set(key,{name,shareholderId: e.shareholderId||null,openUSD:0,openIQD:0,depUSD:0,depIQD:0,withUSD:0,withIQD:0});
             const d=new Date(e.date); const amt=signed(e); const isWith=amt<0; const inPeriod=(!fromDate||d>=fromDate)&&(!toDate||d<=toDate);
             if (inPeriod){ if (e.currency==='USD'){ if(isWith) agg.get(key).withUSD+=Math.abs(amt); else agg.get(key).depUSD+=Math.abs(amt);} else if (e.currency==='IQD'){ if(isWith) agg.get(key).withIQD+=Math.abs(amt); else agg.get(key).depIQD+=Math.abs(amt);} }
             else if (fromDate && d<fromDate){ if (e.currency==='USD') agg.get(key).openUSD+=amt; else if (e.currency==='IQD') agg.get(key).openIQD+=amt; }
         }
+        // Add debit amounts from expenses (5107) within the period
+        const expenses = Array.isArray(all.expenses) ? all.expenses : [];
+        const debitMap = new Map();
+        for (const ex of expenses){
+            if ((ex.accountingGuideCode||'') !== '5107') continue;
+            if (!ex.shareholderId) continue;
+            const d = new Date(ex.date);
+            const inPeriod = (!fromDate||d>=fromDate)&&(!toDate||d<=toDate);
+            if (!inPeriod) continue;
+            if (!debitMap.has(ex.shareholderId)) debitMap.set(ex.shareholderId,{usd:0,iqd:0});
+            const cur = debitMap.get(ex.shareholderId);
+            cur.usd += parseFloat(ex.amountUSD)||0;
+            cur.iqd += parseFloat(ex.amountIQD)||0;
+        }
         const rows = Array.from(agg.values()).map(r=>({
             name:r.name,
             openUSD:r.openUSD, depUSD:r.depUSD, withUSD:r.withUSD, balUSD: r.openUSD + r.depUSD - r.withUSD,
-            openIQD:r.openIQD, depIQD:r.depIQD, withIQD:r.withIQD, balIQD: r.openIQD + r.depIQD - r.withIQD
+            openIQD:r.openIQD, depIQD:r.depIQD, withIQD:r.withIQD, balIQD: r.openIQD + r.depIQD - r.withIQD,
+            debitUSD: (r.shareholderId && debitMap.get(r.shareholderId)) ? debitMap.get(r.shareholderId).usd : 0,
+            debitIQD: (r.shareholderId && debitMap.get(r.shareholderId)) ? debitMap.get(r.shareholderId).iqd : 0
         })).sort((a,b)=> a.name.localeCompare(b.name,'ar'));
 
         const data = {
