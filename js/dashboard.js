@@ -561,13 +561,144 @@ class DashboardManager {
 
 // Global functions for HTML onclick events
 function viewTransaction(id, type) {
-    // Implementation for viewing transaction details
-    console.log('View transaction:', id, type);
+    try {
+        const found = findTransactionById(id);
+        if (!found) {
+            alert('لم يتم العثور على العملية.');
+            return;
+        }
+        showTransactionDetailsModal(found.entry, found.kind);
+    } catch (e) {
+        console.error('viewTransaction error', e);
+        alert('تعذر عرض تفاصيل العملية.');
+    }
 }
 
 function editTransaction(id, type) {
-    // Implementation for editing transaction
-    console.log('Edit transaction:', id, type);
+    try {
+        const found = findTransactionById(id);
+        if (!found) {
+            alert('لم يتم العثور على العملية للتعديل.');
+            return;
+        }
+        // Navigate to proper section, then call the right editor
+        if (found.kind === 'capital') {
+            if (typeof showSection === 'function') showSection('capital');
+            waitFor(() => window.capitalManager && typeof window.capitalManager.editCapitalEntry === 'function', 1500)
+                .then(() => window.capitalManager.editCapitalEntry(id))
+                .catch(() => alert('تعذر فتح شاشة تعديل رأس المال.'));
+        } else if (found.kind === 'expense') {
+            if (typeof showSection === 'function') showSection('expenses');
+            waitFor(() => window.expensesManager && typeof window.expensesManager.startEditExpense === 'function', 1500)
+                .then(() => window.expensesManager.startEditExpense(id))
+                .catch(() => alert('تعذر فتح شاشة تعديل المصروف.'));
+        } else if (found.kind === 'revenue') {
+            if (typeof showSection === 'function') showSection('revenue');
+            // Ensure advances view is loaded (where editor/modal lives)
+            waitFor(() => window.revenueManager instanceof Object, 1500)
+                .then(() => { try { window.revenueManager.showAdvances(true); } catch(_) {} })
+                .then(() => waitFor(() => window.revenueManager && typeof window.revenueManager.openAdvanceEdit === 'function', 1500))
+                .then(() => window.revenueManager.openAdvanceEdit(id))
+                .catch(() => alert('تعذر فتح شاشة تعديل الإيراد/السلفة.'));
+        } else {
+            alert('نوع العملية غير معروف للتعديل.');
+        }
+    } catch (e) {
+        console.error('editTransaction error', e);
+        alert('تعذر تنفيذ عملية التعديل.');
+    }
+}
+
+// ---- Helpers for actions ----
+function findTransactionById(id) {
+    const data = StorageManager.getAllData();
+    const cap = (data.capital || []).find(x => x.id === id);
+    if (cap) return { entry: cap, kind: 'capital' };
+    const exp = (data.expenses || []).find(x => x.id === id);
+    if (exp) return { entry: exp, kind: 'expense' };
+    const rev = (data.revenue || []).find(x => x.id === id);
+    if (rev) return { entry: rev, kind: 'revenue' };
+    return null;
+}
+
+function showTransactionDetailsModal(entry, kind) {
+    // Create modal container if not exists
+    let modalEl = document.getElementById('txDetailsModal');
+    if (!modalEl) {
+        modalEl = document.createElement('div');
+        modalEl.id = 'txDetailsModal';
+        modalEl.className = 'modal fade';
+        modalEl.tabIndex = -1;
+        modalEl.innerHTML = `
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title">تفاصيل العملية</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+                </div>
+                <div class="modal-body" id="txDetailsBody"></div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+                </div>
+              </div>
+            </div>`;
+        document.body.appendChild(modalEl);
+    }
+    const body = modalEl.querySelector('#txDetailsBody');
+    const rows = [];
+    // Common fields
+    rows.push(row('النوع', kind === 'capital' ? 'رأس مال' : (kind === 'expense' ? 'مصروف' : 'إيراد')));
+    if (entry.registrationNumber) rows.push(row('رقم القيد', entry.registrationNumber));
+    rows.push(row('التاريخ', formatDateSafe(entry.date)));
+    // Amount/currency logic
+    if (kind === 'expense') {
+        if (entry.amountUSD != null) rows.push(row('المبلغ (USD)', formatCurrencySafe(entry.amountUSD, 'USD')));
+        if (entry.amountIQD != null) rows.push(row('المبلغ (IQD)', formatCurrencySafe(entry.amountIQD, 'IQD')));
+    } else {
+        rows.push(row('العملة', entry.currency));
+        rows.push(row('المبلغ', formatCurrencySafe(entry.amount, entry.currency)));
+    }
+    if (entry.receiptNumber) rows.push(row('رقم الإيصال/السند', entry.receiptNumber));
+    if (entry.shareholderId && kind === 'capital') rows.push(row('المساهم', entry.shareholderName || entry.shareholderId));
+    if (entry.beneficiary && kind === 'expense') rows.push(row('المستفيد', entry.beneficiary));
+    if (entry.grantor && kind === 'revenue') rows.push(row('الجهة المانحة', entry.grantor));
+    if (entry.category) rows.push(row('الفئة', entry.category));
+    if (entry.notes || entry.description) rows.push(row('الوصف', entry.description || entry.notes));
+
+    body.innerHTML = `
+        <div class="table-responsive">
+          <table class="table table-bordered align-middle mb-0">
+            <tbody>
+              ${rows.join('')}
+            </tbody>
+          </table>
+        </div>`;
+
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    modal.show();
+
+    function row(label, value) {
+        return `<tr><th style="width:220px">${label}</th><td>${value ?? '-'}</td></tr>`;
+    }
+    function formatDateSafe(d) {
+        try { return new Date(d).toLocaleDateString('ar-IQ', {year:'numeric', month:'short', day:'numeric'}); } catch { return d || '-'; }
+    }
+    function formatCurrencySafe(n, c) {
+        try { return window.dashboardManager ? window.dashboardManager.formatCurrency(n, c) : (c==='USD' ? new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(n||0) : new Intl.NumberFormat('ar-IQ').format(n||0) + ' د.ع'); } catch { return n; }
+    }
+}
+
+// small waiter utility
+function waitFor(predicate, timeoutMs = 1500, intervalMs = 50) {
+    return new Promise((resolve, reject) => {
+        const start = Date.now();
+        const timer = setInterval(() => {
+            try {
+                if (predicate()) { clearInterval(timer); resolve(true); }
+                else if (Date.now() - start > timeoutMs) { clearInterval(timer); reject(new Error('timeout')); }
+            } catch (e) { clearInterval(timer); reject(e); }
+        }, intervalMs);
+    });
 }
 
 function exportDashboard() {
