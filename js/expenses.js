@@ -51,6 +51,12 @@ class ExpensesManager {
                                     </a>
                                 </li>
                                 <li class="nav-item">
+                                    <a class="nav-link" href="#" onclick="expensesManager.showView('shareholders-refund')">
+                                        <i class="bi bi-cash-coin me-2"></i>مسترجع المساهمين
+                                        <span class="badge bg-secondary ms-2">قيد التطوير</span>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
                                     <a class="nav-link" href="#" onclick="expensesManager.showView('categories')">
                                         <i class="bi bi-tags me-2"></i>فئات المصروفات
                                     </a>
@@ -110,6 +116,9 @@ class ExpensesManager {
             case 'add-expense':
                 this.loadAddExpenseView();
                 break;
+            case 'shareholders-refund':
+                this.loadShareholdersRefundView();
+                break;
             case 'categories':
                 this.loadCategoriesView();
                 break;
@@ -124,6 +133,27 @@ class ExpensesManager {
                 this.loadCreditPurchaseView('menu');
                 break;
         }
+    }
+
+    // View: Shareholders Refund (Under Development)
+    loadShareholdersRefundView() {
+        const container = document.getElementById('expensesContent');
+        if (!container) return;
+
+        const html = `
+            <div class="neumorphic-card">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <h4 class="mb-0"><i class="bi bi-cash-coin me-2"></i>مسترجع المساهمين</h4>
+                    <span class="badge bg-secondary">قيد التطوير</span>
+                </div>
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-tools display-4 text-muted"></i>
+                    <h4 class="mt-3 text-muted">هذه الميزة قيد التطوير</h4>
+                    <p class="text-muted">سيتم إضافة إدارة مسترجعات المساهمين في إصدار لاحق</p>
+                </div>
+            </div>
+        `;
+        container.innerHTML = html;
     }
 
     // View: Credit Purchase (Deferred Purchase)
