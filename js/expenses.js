@@ -5,6 +5,10 @@ class ExpensesManager {
         this.editingId = null;
         this.lastSavedEntry = null;
         this.editingGuideId = null;
+        // Shareholder refund edit mode
+        this.editingShareholderRefundId = null;
+        // Tracks whether currently editing a refund from 'expense' (new model) or legacy 'revenue'
+        this.editingShareholderRefundSource = null;
     // اختيار نوع قيد الشراء بالآجل (purchase_receipt | measurement)
     this.creditPurchaseType = null;
     this.creditPurchaseSubView = null; // (suppliers | add | settlements)
@@ -53,7 +57,7 @@ class ExpensesManager {
                                 <li class="nav-item">
                                     <a class="nav-link" href="#" onclick="expensesManager.showView('shareholders-refund')">
                                         <i class="bi bi-cash-coin me-2"></i>مسترجع المساهمين
-                                        <span class="badge bg-secondary ms-2">قيد التطوير</span>
+                                        <span class="badge bg-info ms-2">تسوية 5107</span>
                                     </a>
                                 </li>
                                 <li class="nav-item">
@@ -135,27 +139,569 @@ class ExpensesManager {
         }
     }
 
-    // View: Shareholders Refund (Under Development)
+    // View: Shareholders Refund (Settlement against 5107)
     loadShareholdersRefundView() {
         const container = document.getElementById('expensesContent');
         if (!container) return;
 
+        const shareholders = StorageManager.getData(StorageManager.STORAGE_KEYS.SHAREHOLDERS) || [];
+        const hasShareholders = shareholders.length > 0;
+        const reg = `RF-${StorageManager.generateRegistrationNumber()}`;
+
         const html = `
-            <div class="neumorphic-card">
+            <div class="neumorphic-card mb-3">
                 <div class="card-header d-flex align-items-center justify-content-between">
                     <h4 class="mb-0"><i class="bi bi-cash-coin me-2"></i>مسترجع المساهمين</h4>
-                    <span class="badge bg-secondary">قيد التطوير</span>
+                    <span class="badge bg-info">تسوية حساب 5107</span>
                 </div>
-                <div class="card-body text-center py-5">
-                    <i class="bi bi-tools display-4 text-muted"></i>
-                    <h4 class="mt-3 text-muted">هذه الميزة قيد التطوير</h4>
-                    <p class="text-muted">سيتم إضافة إدارة مسترجعات المساهمين في إصدار لاحق</p>
+                <div class="card-body">
+                    <form id="shareholderRefundForm" class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label"><i class="bi bi-receipt me-1"></i>رقم الوصل</label>
+                            <input type="text" id="shrRefReg" class="form-control neumorphic-input" value="${reg}" readonly>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label"><i class="bi bi-calendar3 me-1"></i>التاريخ</label>
+                            <input type="date" id="shrRefDate" class="form-control neumorphic-input" value="${new Date().toISOString().split('T')[0]}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="bi bi-person-badge me-1"></i>اسم المساهم</label>
+                            <select id="shrRefShareholder" class="form-control neumorphic-input" ${hasShareholders ? '' : 'disabled'}>
+                                <option value="">${hasShareholders ? 'اختر المساهم' : 'لا يوجد مساهمون (أضف من الإعدادات)'}</option>
+                                ${shareholders.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
+                            </select>
+                            <div id="shrRefStats" class="form-text mt-2"></div>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label"><i class="bi bi-currency-exchange me-1"></i>العملة</label>
+                            <select id="shrRefCurrency" class="form-control neumorphic-input">
+                                <option value="USD">دولار (USD)</option>
+                                <option value="IQD">دينار (IQD)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label"><i class="bi bi-cash-stack me-1"></i>المبلغ</label>
+                            <input type="number" id="shrRefAmount" class="form-control neumorphic-input" step="0.01" min="0" placeholder="0.00">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="bi bi-book me-1"></i>الدليل المحاسبي</label>
+                            <input type="text" class="form-control neumorphic-input" value="5107 - سحب مالي من قبل مساهم (سحوبات المساهمين)" readonly>
+                            <div class="form-text">كل المسترجعات تُسوى على الحساب 5107 تلقائياً</div>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label"><i class="bi bi-card-text me-1"></i>ملاحظات</label>
+                            <textarea id="shrRefNotes" class="form-control neumorphic-input" rows="2" placeholder="وصف المسترجع (اختياري)"></textarea>
+                        </div>
+
+                        <div class="col-12 d-flex gap-2">
+                            <button type="submit" id="shrRefSubmitBtn" class="btn btn-primary neumorphic-btn"><i class="bi bi-save me-2"></i><span id="shrRefSubmitText">حفظ المسترجع</span></button>
+                            <button type="reset" class="btn btn-secondary neumorphic-btn"><i class="bi bi-arrow-clockwise me-2"></i>إعادة تعيين</button>
+                            <span id="shrRefEditBadge" class="badge bg-warning align-self-center" style="display:none"><i class="bi bi-pencil-square me-1"></i>وضع التعديل مفعل</span>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="neumorphic-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-list-ul me-2"></i>أحدث مسترجعات المساهمين</h5>
+                    <div class="d-flex gap-2 align-items-center">
+                        <input id="shrRefSearch" type="search" class="form-control form-control-sm" placeholder="بحث بالإيصال/الملاحظات/اسم المساهم" style="min-width: 260px;">
+                        <small class="text-muted">إن لم تحدد مساهماً سيتم عرض جميع المسترجعات</small>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="shrRefRecent">لا توجد بيانات</div>
                 </div>
             </div>
         `;
+
         container.innerHTML = html;
+
+        // Bind events
+        const form = document.getElementById('shareholderRefundForm');
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handleSaveShareholderRefund();
+            });
+            form.addEventListener('reset', () => {
+                // regenerate receipt number on reset
+                const input = document.getElementById('shrRefReg');
+                if (input) input.value = `RF-${StorageManager.generateRegistrationNumber()}`;
+            });
+        }
+
+        const shareholderSelect = document.getElementById('shrRefShareholder');
+        if (shareholderSelect) {
+            shareholderSelect.addEventListener('change', () => {
+                this.updateShareholderRefundStats();
+                this.renderShareholderRefundsTable();
+            });
+        }
+        const searchInput = document.getElementById('shrRefSearch');
+        if (searchInput) {
+            searchInput.addEventListener('input', () => this.renderShareholderRefundsTable());
+        }
+
+        // Adjust step based on currency
+        const currencySel = document.getElementById('shrRefCurrency');
+        const amountInp = document.getElementById('shrRefAmount');
+        if (currencySel && amountInp) {
+            currencySel.addEventListener('change', () => {
+                if (currencySel.value === 'IQD') {
+                    amountInp.step = '1';
+                    amountInp.placeholder = '0';
+                    // Ensure whole numbers for IQD
+                    const v = Number(amountInp.value || 0);
+                    if (!Number.isNaN(v)) amountInp.value = String(Math.round(v));
+                } else {
+                    amountInp.step = '0.01';
+                    amountInp.placeholder = '0.00';
+                }
+            });
+            // When typing IQD, keep it as integer
+            amountInp.addEventListener('input', () => {
+                if (currencySel.value === 'IQD') {
+                    const v = Number(amountInp.value || 0);
+                    if (!Number.isNaN(v)) amountInp.value = String(Math.round(v));
+                }
+            });
+        }
+
+        // Initial render (show all latest by default)
+        this.renderShareholderRefundsTable();
     }
 
+    // Compute and render stats for selected shareholder
+    updateShareholderRefundStats() {
+        const statsDiv = document.getElementById('shrRefStats');
+        const sel = document.getElementById('shrRefShareholder');
+        if (!statsDiv || !sel) return;
+        const shareholderId = sel.value;
+        if (!shareholderId) { statsDiv.innerHTML = ''; return; }
+
+        const totals = this.computeShareholderWithdrawRefundTotals(shareholderId);
+        const name = (StorageManager.getData(StorageManager.STORAGE_KEYS.SHAREHOLDERS) || []).find(s=>s.id===shareholderId)?.name || '';
+
+        statsDiv.innerHTML = `
+            <div class="p-2 border rounded bg-light">
+                <div class="fw-bold mb-1">${name}</div>
+                <div class="small text-muted">إجمالي المسحوبات من المصروفات (5107):
+                    <span class="ms-1">${this.formatCurrency(totals.withdrawUSD,'USD')}</span>
+                    <span class="ms-2">${this.formatCurrency(totals.withdrawIQD,'IQD')}</span>
+                </div>
+                <div class="small text-muted">إجمالي المسترجعات المسجلة:
+                    <span class="ms-1">${this.formatCurrency(totals.refundUSD,'USD')}</span>
+                    <span class="ms-2">${this.formatCurrency(totals.refundIQD,'IQD')}</span>
+                </div>
+                <div class="small">الرصيد المتبقي:
+                    <span class="ms-1 text-${totals.balanceUSD>=0?'danger':'success'}">${this.formatCurrency(totals.balanceUSD,'USD')}</span>
+                    <span class="ms-2 text-${totals.balanceIQD>=0?'danger':'success'}">${this.formatCurrency(totals.balanceIQD,'IQD')}</span>
+                </div>
+            </div>`;
+    }
+
+    // Calculate totals for a shareholder
+    computeShareholderWithdrawRefundTotals(shareholderId) {
+        const data = StorageManager.getAllData();
+        const expenses = Array.isArray(data.expenses) ? data.expenses : [];
+        const revenue = Array.isArray(data.revenue) ? data.revenue : [];
+
+        // Sum withdrawals from expenses (accountingGuideCode 5107) - positive amounts only
+        const filteredExp = expenses.filter(e => e.accountingGuideCode === '5107' && e.shareholderId === shareholderId);
+        const withdrawUSD = filteredExp.reduce((s,e)=> s + Math.max(0, Number(e.amountUSD)||0), 0);
+        const withdrawIQD = filteredExp.reduce((s,e)=> s + Math.max(0, Number(e.amountIQD)||0), 0);
+
+        // Sum refunds recorded as negative expenses on 5107 (new model)
+        const refundFromExpUSD = filteredExp.reduce((s,e)=> s + Math.abs(Math.min(0, Number(e.amountUSD)||0)), 0);
+        const refundFromExpIQD = filteredExp.reduce((s,e)=> s + Math.abs(Math.min(0, Number(e.amountIQD)||0)), 0);
+
+        // Backward compatibility: Sum refunds previously recorded in revenue with type 'shareholder-refund'
+        const filteredRef = revenue.filter(r => r.type === 'shareholder-refund' && r.shareholderId === shareholderId);
+        const refundFromRevUSD = filteredRef.filter(r=> (r.currency||'').toUpperCase()==='USD').reduce((s,r)=> s + (Number(r.amount)||0), 0);
+        const refundFromRevIQD = filteredRef.filter(r=> (r.currency||'').toUpperCase()==='IQD').reduce((s,r)=> s + (Number(r.amount)||0), 0);
+
+        const refundUSD = refundFromExpUSD + refundFromRevUSD;
+        const refundIQD = refundFromExpIQD + refundFromRevIQD;
+
+        return {
+            withdrawUSD, withdrawIQD,
+            refundUSD, refundIQD,
+            balanceUSD: withdrawUSD - refundUSD,
+            balanceIQD: withdrawIQD - refundIQD
+        };
+    }
+
+    // Save refund entry as a negative expense on 5107 (new model) and refresh UI
+    handleSaveShareholderRefund() {
+        const shareholderId = document.getElementById('shrRefShareholder')?.value || '';
+        const currency = document.getElementById('shrRefCurrency')?.value || 'USD';
+        let amount = Number(document.getElementById('shrRefAmount')?.value || 0);
+        const date = document.getElementById('shrRefDate')?.value || new Date().toISOString().split('T')[0];
+        const receiptNumber = document.getElementById('shrRefReg')?.value || `RF-${StorageManager.generateRegistrationNumber()}`;
+        const notes = document.getElementById('shrRefNotes')?.value || '';
+
+        if (!shareholderId) { this.showNotification('يرجى اختيار اسم المساهم', 'error'); return; }
+        if (!amount || amount <= 0) { this.showNotification('يرجى إدخال مبلغ صحيح', 'error'); return; }
+
+        // Enforce integer for IQD amounts
+        const cur = (currency || 'USD').toUpperCase();
+        if (cur === 'IQD') amount = Math.round(amount);
+
+        // Prevent over-refund beyond remaining balance per currency
+        // When editing, allow using back the original amount
+        let allowedRemaining = 0;
+        const totals = this.computeShareholderWithdrawRefundTotals(shareholderId);
+        allowedRemaining = cur === 'USD' ? totals.balanceUSD : totals.balanceIQD;
+        if (this.editingShareholderRefundId) {
+            // Add back the old amount if editing and same person+currency
+            if (this.editingShareholderRefundSource === 'expense') {
+                const allExp = StorageManager.getData(StorageManager.STORAGE_KEYS.EXPENSES) || [];
+                const old = allExp.find(e => e.id === this.editingShareholderRefundId);
+                if (old && old.shareholderId === shareholderId) {
+                    const oldUSD = Number(old.amountUSD)||0;
+                    const oldIQD = Number(old.amountIQD)||0;
+                    if (cur==='USD' && oldUSD<0) allowedRemaining += Math.abs(oldUSD);
+                    if (cur==='IQD' && oldIQD<0) allowedRemaining += Math.abs(oldIQD);
+                }
+            } else if (this.editingShareholderRefundSource === 'revenue') {
+                const allRev = StorageManager.getData(StorageManager.STORAGE_KEYS.REVENUE) || [];
+                const old = allRev.find(r => r.id === this.editingShareholderRefundId);
+                if (old) {
+                    const samePerson = old.shareholderId === shareholderId;
+                    const sameCur = (old.currency || '').toUpperCase() === cur;
+                    if (samePerson && sameCur) {
+                        allowedRemaining += Number(old.amount || 0);
+                    }
+                }
+            }
+        }
+        if (amount > allowedRemaining) {
+            this.showNotification(`المبلغ يتجاوز الرصيد المتبقي (${this.formatCurrency(allowedRemaining, cur)}) على الحساب 5107 لهذا المساهم`, 'warning');
+            return;
+        }
+
+        const shareholder = (StorageManager.getData(StorageManager.STORAGE_KEYS.SHAREHOLDERS) || []).find(s=>s.id===shareholderId);
+        const shareholderName = shareholder?.name || '';
+
+        // Build negative expense entry on 5107
+        const settings = StorageManager.getData(StorageManager.STORAGE_KEYS.SETTINGS) || { exchangeRate: 1500 };
+        const expenseEntry = {
+            date,
+            amountUSD: cur==='USD' ? -Number(amount) : 0,
+            amountIQD: cur==='IQD' ? -Number(amount) : 0,
+            exchangeRate: Number(settings.exchangeRate)||1500,
+            description: 'مسترجع مساهم - تسوية سحوبات 5107',
+            accountingGuide: '', // not required when code is set
+            accountingGuideCode: '5107',
+            accountingGuideName: 'سحب مالي من قبل مساهم (سحوبات المساهمين)',
+            receiptNumber,
+            receiptDate: date,
+            vendor: '',
+            paymentMethod: 'cash',
+            category: 'مسترجعات المساهمين',
+            project: '',
+            notes: notes || 'مسترجع مساهم - تسوية سحوبات 5107',
+            shareholderId,
+            shareholderName,
+            currency: cur,
+            amount: -Number(amount),
+            hasBothCurrencies: false,
+            hasIQDOnly: cur==='IQD',
+            hasUSDOnly: cur==='USD',
+            type: 'shareholder-refund', // marker for readability
+            source: 'shareholders-refund-form'
+        };
+
+        let success = false;
+        let convertedFromRevenue = false;
+        if (this.editingShareholderRefundId) {
+            if (this.editingShareholderRefundSource === 'expense') {
+                success = !!StorageManager.updateExpenseEntry(this.editingShareholderRefundId, expenseEntry);
+            } else {
+                // Legacy revenue -> convert to expense by adding new expense then deleting revenue
+                const newExp = StorageManager.addExpenseEntry(expenseEntry);
+                if (newExp) {
+                    convertedFromRevenue = true;
+                    StorageManager.deleteRevenueEntry(this.editingShareholderRefundId);
+                    success = true;
+                } else {
+                    success = false;
+                }
+            }
+        } else {
+            success = !!StorageManager.addExpenseEntry(expenseEntry);
+        }
+
+        if (success) {
+            const msg = this.editingShareholderRefundId
+                ? (convertedFromRevenue ? 'تم تحديث المسترجع وتحويله إلى قيد مصروف سالب 5107' : 'تم تحديث مسترجع المساهم كمصروف سالب 5107')
+                : 'تم حفظ مسترجع المساهم كمصروف سالب على 5107 وإرجاع المبلغ إلى الصندوق';
+            this.showNotification(msg, 'success');
+            // Leave edit mode if any
+            if (this.editingShareholderRefundId) this.exitShareholderRefundEditMode();
+            // Refresh stats and list
+            this.updateShareholderRefundStats();
+            this.renderShareholderRefundsTable();
+            // Reset amount and regenerate receipt
+            const amt = document.getElementById('shrRefAmount');
+            if (amt) amt.value = '';
+            const rec = document.getElementById('shrRefReg');
+            if (rec) rec.value = `RF-${StorageManager.generateRegistrationNumber()}`;
+        } else {
+            this.showNotification('تعذر حفظ المسترجع', 'error');
+        }
+    }
+
+    // Render recent refunds table (filtered by shareholder if selected, else show all)
+    renderShareholderRefundsTable() {
+        const area = document.getElementById('shrRefRecent');
+        const sel = document.getElementById('shrRefShareholder');
+        if (!area || !sel) return;
+        const shareholderId = sel.value || '';
+        const q = (document.getElementById('shrRefSearch')?.value || '').trim().toLowerCase();
+
+            const shareholders = StorageManager.getData(StorageManager.STORAGE_KEYS.SHAREHOLDERS) || [];
+            // New model: refunds as negative expenses on 5107
+            const allExp = StorageManager.getData(StorageManager.STORAGE_KEYS.EXPENSES) || [];
+            const expRefunds = allExp
+                .filter(e => e.accountingGuideCode === '5107' && (!!e.shareholderId))
+                .filter(e => (Number(e.amountUSD)||0) < 0 || (Number(e.amountIQD)||0) < 0)
+                .filter(e => !shareholderId || e.shareholderId === shareholderId)
+                .map(e => {
+                    const amtUSD = Number(e.amountUSD)||0; const amtIQD = Number(e.amountIQD)||0;
+                    const useUSD = amtUSD < 0; const cur = useUSD ? 'USD' : 'IQD';
+                    const amt = Math.abs(useUSD ? amtUSD : amtIQD);
+                    return {
+                        source: 'expense',
+                        id: e.id,
+                        date: e.date,
+                        createdAt: e.createdAt,
+                        receiptNumber: e.receiptNumber || e.registrationNumber || '',
+                        shareholderId: e.shareholderId,
+                        currency: cur,
+                        amount: amt,
+                        notes: e.notes || ''
+                    };
+                });
+
+            // Legacy model: refunds saved as revenue entries
+            const revRefunds = (StorageManager.getData(StorageManager.STORAGE_KEYS.REVENUE) || [])
+                .filter(r => r.type === 'shareholder-refund')
+                .filter(r => !shareholderId || r.shareholderId === shareholderId)
+                .map(r => ({
+                    source: 'revenue',
+                    id: r.id,
+                    date: r.date,
+                    createdAt: r.createdAt,
+                    receiptNumber: r.receiptNumber || r.registrationNumber || '',
+                    shareholderId: r.shareholderId,
+                    currency: (r.currency||'').toUpperCase(),
+                    amount: Number(r.amount)||0,
+                    notes: r.notes || ''
+                }));
+
+            const unified = expRefunds.concat(revRefunds)
+                .filter(r => {
+                    if (!q) return true;
+                    const shName = shareholders.find(s=>s.id===r.shareholderId)?.name || '';
+                    return (
+                        (r.receiptNumber||'').toLowerCase().includes(q) ||
+                        (r.notes||'').toLowerCase().includes(q) ||
+                        shName.toLowerCase().includes(q)
+                    );
+                })
+                .sort((a,b)=> new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date))
+                .slice(0, 50);
+
+            if (unified.length === 0) {
+                area.innerHTML = `<div class="text-muted">${shareholderId ? 'لا توجد مسترجعات مسجلة لهذا المساهم بعد.' : 'لا توجد مسترجعات مسجلة بعد.'}</div>`;
+                return;
+            }
+
+            // Precompute balances per shareholder
+            const computeBalances = (shId) => this.computeShareholderWithdrawRefundTotals(shId);
+
+            const rowsHtml = unified.map(r => {
+                const sh = shareholders.find(s=>s.id===r.shareholderId);
+                const name = sh?.name || '-';
+                const bal = computeBalances(r.shareholderId);
+                const balHtml = `<span class="badge ${ (bal.balanceUSD>0?'bg-danger':(bal.balanceUSD<0?'bg-success':'bg-secondary')) } me-1">${this.formatCurrency(bal.balanceUSD,'USD')}</span>
+                                 <span class="badge ${ (bal.balanceIQD>0?'bg-danger':(bal.balanceIQD<0?'bg-success':'bg-secondary')) }">${this.formatCurrency(bal.balanceIQD,'IQD')}</span>`;
+                return `
+                    <tr>
+                        <td>${this.formatDate(r.date)}</td>
+                        <td>${r.receiptNumber || '-'}</td>
+                        <td>${name}</td>
+                        <td>${r.currency}</td>
+                        <td>${this.formatCurrency(r.amount, r.currency)}</td>
+                        <td>${balHtml}</td>
+                        <td>${r.notes || ''}</td>
+                        <td class="text-nowrap">
+                            <button class="btn btn-sm btn-outline-primary me-1" title="تعديل" onclick="expensesManager.handleEditShareholderRefund('${r.source}','${r.id}')"><i class="bi bi-pencil-square"></i></button>
+                            <button class="btn btn-sm btn-outline-danger me-1" title="حذف" onclick="expensesManager.handleDeleteShareholderRefund('${r.source}','${r.id}')"><i class="bi bi-trash"></i></button>
+                            <button class="btn btn-sm btn-outline-secondary" title="طباعة" onclick="expensesManager.handlePrintShareholderRefund('${r.source}','${r.id}')"><i class="bi bi-printer"></i></button>
+                        </td>
+                    </tr>`;
+            }).join('');
+
+            const html = `
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped align-middle">
+                        <thead>
+                            <tr>
+                                <th>التاريخ</th>
+                                <th>الإيصال</th>
+                                <th>المساهم</th>
+                                <th>العملة</th>
+                                <th>المبلغ</th>
+                                <th>رصيده النهائي (USD/IQD)</th>
+                                <th>ملاحظات</th>
+                                <th>الإجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rowsHtml}</tbody>
+                    </table>
+                </div>`;
+            area.innerHTML = html;
+
+        }
+
+        // Enter edit mode for a refund entry
+        handleEditShareholderRefund(source, id){
+            let record = null;
+            if(source==='expense'){
+                const expenses = StorageManager.getData(StorageManager.STORAGE_KEYS.EXPENSES) || [];
+                record = expenses.find(x=>x.id===id);
+                if(!record){ this.showNotification('القيد غير موجود','error'); return; }
+                const reg = document.getElementById('shrRefReg');
+                const date = document.getElementById('shrRefDate');
+                const shSel = document.getElementById('shrRefShareholder');
+                const curSel = document.getElementById('shrRefCurrency');
+                const amt = document.getElementById('shrRefAmount');
+                const notes = document.getElementById('shrRefNotes');
+                const amtUSD = Number(record.amountUSD)||0; const amtIQD = Number(record.amountIQD)||0;
+                const useUSD = amtUSD < 0; const cur = useUSD ? 'USD' : 'IQD';
+                const val = Math.abs(useUSD ? amtUSD : amtIQD);
+                if (reg) reg.value = record.receiptNumber || `RF-${record.registrationNumber || ''}`;
+                if (date) date.value = (record.date || '').split('T')[0] || new Date().toISOString().split('T')[0];
+                if (shSel) shSel.value = record.shareholderId || '';
+                if (curSel) curSel.value = cur;
+                if (amt) amt.value = val;
+                if (notes) notes.value = record.notes || '';
+            } else {
+                const revenue = StorageManager.getData(StorageManager.STORAGE_KEYS.REVENUE) || [];
+                record = revenue.find(x=>x.id===id);
+                if(!record){ this.showNotification('القيد غير موجود','error'); return; }
+                const reg = document.getElementById('shrRefReg');
+                const date = document.getElementById('shrRefDate');
+                const shSel = document.getElementById('shrRefShareholder');
+                const curSel = document.getElementById('shrRefCurrency');
+                const amt = document.getElementById('shrRefAmount');
+                const notes = document.getElementById('shrRefNotes');
+                if (reg) reg.value = record.receiptNumber || `RF-${record.registrationNumber || ''}`;
+                if (date) date.value = (record.date || '').split('T')[0] || new Date().toISOString().split('T')[0];
+                if (shSel) shSel.value = record.shareholderId || '';
+                if (curSel) curSel.value = (record.currency||'USD').toUpperCase();
+                if (amt) amt.value = record.amount;
+                if (notes) notes.value = record.notes || '';
+            }
+            // Update stats
+            this.updateShareholderRefundStats();
+            // Set edit mode
+            this.editingShareholderRefundId = id;
+            this.editingShareholderRefundSource = source;
+            const badge = document.getElementById('shrRefEditBadge');
+            const btnText = document.getElementById('shrRefSubmitText');
+            if (badge) badge.style.display = '';
+            if (btnText) btnText.textContent = 'تحديث المسترجع';
+            this.showNotification('تم تحميل المسترجع للتعديل، احفظ لاستبداله','info');
+        }
+
+        // Exit edit mode and reset UI parts
+        exitShareholderRefundEditMode(){
+            this.editingShareholderRefundId = null;
+            this.editingShareholderRefundSource = null;
+            const badge = document.getElementById('shrRefEditBadge');
+            const btnText = document.getElementById('shrRefSubmitText');
+            if (badge) badge.style.display = 'none';
+            if (btnText) btnText.textContent = 'حفظ المسترجع';
+        }
+
+        // Delete refund
+        handleDeleteShareholderRefund(source, id){
+            if(!confirm('هل أنت متأكد من حذف هذا المسترجع؟')) return;
+            let ok = false;
+            if(source==='expense') ok = StorageManager.deleteExpenseEntry(id);
+            else ok = StorageManager.deleteRevenueEntry(id);
+            if(ok){
+                // If we were editing this one, exit edit mode
+                if(this.editingShareholderRefundId===id) this.exitShareholderRefundEditMode();
+                this.showNotification('تم حذف المسترجع','success');
+                this.updateShareholderRefundStats();
+                this.renderShareholderRefundsTable();
+            } else {
+                this.showNotification('حدث خطأ أثناء الحذف','error');
+            }
+        }
+
+        // Print refund voucher
+        handlePrintShareholderRefund(source, id){
+            let rec = null;
+            if(source==='expense'){
+                const exps = StorageManager.getData(StorageManager.STORAGE_KEYS.EXPENSES) || [];
+                rec = exps.find(x=>x.id===id);
+                if(!rec){ this.showNotification('لم يتم العثور على القيد للطباعة','error'); return; }
+                const sh = (StorageManager.getData(StorageManager.STORAGE_KEYS.SHAREHOLDERS) || []).find(s=>s.id===rec.shareholderId);
+                const amtUSD = Number(rec.amountUSD)||0; const amtIQD = Number(rec.amountIQD)||0;
+                const useUSD = amtUSD < 0; const cur = useUSD ? 'USD' : 'IQD';
+                const val = Math.abs(useUSD ? amtUSD : amtIQD);
+                const win = window.open('', '_blank');
+                const title = 'سند استرجاع مساهم';
+                const html = `<!doctype html><html lang="ar"><head><meta charset="utf-8"><title>${title}</title>
+                <style>body{font-family:Tahoma,Arial;direction:rtl;padding:20px} .hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+                table{width:100%;border-collapse:collapse} td,th{border:1px solid #ccc;padding:8px;text-align:right} .text-center{text-align:center}
+                .muted{color:#666;font-size:12px}
+                </style></head><body>
+                <div class="hdr"><h3>${title}</h3><div class="muted">${new Date().toLocaleString()}</div></div>
+                <table>
+                    <tr><th>الإيصال</th><td>${rec.receiptNumber || rec.registrationNumber || '-'}</td><th>التاريخ</th><td>${this.formatDate(rec.date)}</td></tr>
+                    <tr><th>المساهم</th><td>${sh?.name || '-'}</td><th>العملة</th><td>${cur}</td></tr>
+                    <tr><th>المبلغ</th><td colspan="3">${this.formatCurrency(val, cur)}</td></tr>
+                    <tr><th>ملاحظات</th><td colspan="3">${rec.notes || ''}</td></tr>
+                </table>
+                <div style="margin-top:24px;display:flex;justify-content:space-between"><div>توقيع المحاسب: ____________</div><div>توقيع المساهم: ____________</div></div>
+                <script>window.onload=()=>window.print();</script>
+                </body></html>`;
+                if (win) { win.document.open(); win.document.write(html); win.document.close(); }
+            } else {
+                const revenue = StorageManager.getData(StorageManager.STORAGE_KEYS.REVENUE) || [];
+                const r = revenue.find(x=>x.id===id);
+                if(!r){ this.showNotification('لم يتم العثور على القيد للطباعة','error'); return; }
+                const sh = (StorageManager.getData(StorageManager.STORAGE_KEYS.SHAREHOLDERS) || []).find(s=>s.id===r.shareholderId);
+                const win = window.open('', '_blank');
+                const title = 'سند استرجاع مساهم';
+                const html = `<!doctype html><html lang="ar"><head><meta charset="utf-8"><title>${title}</title>
+                <style>body{font-family:Tahoma,Arial;direction:rtl;padding:20px} .hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+                table{width:100%;border-collapse:collapse} td,th{border:1px solid #ccc;padding:8px;text-align:right} .text-center{text-align:center}
+                .muted{color:#666;font-size:12px}
+                </style></head><body>
+                <div class="hdr"><h3>${title}</h3><div class="muted">${new Date().toLocaleString()}</div></div>
+                <table>
+                    <tr><th>الإيصال</th><td>${r.receiptNumber || r.registrationNumber || '-'}</td><th>التاريخ</th><td>${this.formatDate(r.date)}</td></tr>
+                    <tr><th>المساهم</th><td>${sh?.name || '-'}</td><th>العملة</th><td>${r.currency}</td></tr>
+                    <tr><th>المبلغ</th><td colspan="3">${this.formatCurrency(r.amount, r.currency)}</td></tr>
+                    <tr><th>ملاحظات</th><td colspan="3">${r.notes || ''}</td></tr>
+                </table>
+                <div style="margin-top:24px;display:flex;justify-content:space-between"><div>توقيع المحاسب: ____________</div><div>توقيع المساهم: ____________</div></div>
+                <script>window.onload=()=>window.print();</script>
+                </body></html>`;
+                if (win) { win.document.open(); win.document.write(html); win.document.close(); }
+            }
+        }
     // View: Credit Purchase (Deferred Purchase)
     loadCreditPurchaseView(subView) {
         // تحديد المشهد الفرعي
