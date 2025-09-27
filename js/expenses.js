@@ -3170,6 +3170,8 @@ class ExpensesManager {
                             <select class="form-control neumorphic-input" id="expenseShareholder">
                                 <option value="">اختر المساهم</option>
                             </select>
+                            <!-- رصيد المساهم الحالي (صافي السحب - الإيداع) يظهر بعد اختيار اسم المساهم -->
+                            <div id="shareholderBalanceInfo" class="mt-2" style="display:none;"></div>
                             <div class="form-text text-muted">سيظهر هذا الحقل فقط عند اختيار الحساب 5107: سحب مالي من قبل مساهم</div>
                         </div>
 
@@ -4485,6 +4487,35 @@ class ExpensesManager {
                                     beneficiaryInput.value = (opt && opt.value) ? opt.text : '';
                                 };
                             }
+
+                            // عرض رصيد المساهم (USD/IQD) بجانب الاسم
+                            const balDiv = document.getElementById('shareholderBalanceInfo');
+                            const updateShareholderBalanceInfo = () => {
+                                if (!balDiv) return;
+                                const selVal = shareholderSelect.value || '';
+                                if (!selVal){ balDiv.style.display = 'none'; balDiv.innerHTML = ''; return; }
+                                const totals = (typeof expensesManager.computeShareholderWithdrawRefundTotals === 'function') ? expensesManager.computeShareholderWithdrawRefundTotals(selVal) : null;
+                                if (!totals){ balDiv.style.display = 'none'; balDiv.innerHTML = ''; return; }
+                                const usd = Number(totals.balanceUSD||0);
+                                const iqd = Number(totals.balanceIQD||0);
+                                const usdColor = usd >= 0 ? 'danger' : 'success';
+                                const iqdColor = iqd >= 0 ? 'danger' : 'success';
+                                balDiv.innerHTML = `
+                                    <div class="d-flex flex-wrap align-items-center gap-2">
+                                        <span class="badge bg-light text-dark">
+                                            IQD: <span class="text-${iqdColor} fw-bold ms-1">${expensesManager.formatCurrency(iqd,'IQD')}</span>
+                                        </span>
+                                        <span class="badge bg-light text-dark">
+                                            USD: <span class="text-${usdColor} fw-bold ms-1">${expensesManager.formatCurrency(usd,'USD')}</span>
+                                        </span>
+                                        <span class="text-muted small">صافي السحب - الإيداع</span>
+                                    </div>`;
+                                balDiv.style.display = '';
+                            };
+                            try { shareholderSelect.removeEventListener('change', updateShareholderBalanceInfo); } catch(_){}
+                            shareholderSelect.addEventListener('change', updateShareholderBalanceInfo);
+                            // تحديث فوري عند الفتح
+                            updateShareholderBalanceInfo();
                             // Update category when direction changes (only for 5107)
                             const onDirChange = ()=>{
                                 if (!categorySelect) return;
@@ -4502,6 +4533,8 @@ class ExpensesManager {
                         if (shareholderRow) shareholderRow.style.display = 'none';
                         if (directionRow) directionRow.style.display = 'none';
                         if (shareholderSelect) { shareholderSelect.required = false; shareholderSelect.value = ''; }
+                        const balDiv = document.getElementById('shareholderBalanceInfo');
+                        if (balDiv){ balDiv.style.display = 'none'; balDiv.innerHTML = ''; }
                         // Re-enable category editing for non-5107
                         if (categorySelect) categorySelect.disabled = false;
                         // أعد تمكين تحرير المستفيد عند عدم اختيار 5107
