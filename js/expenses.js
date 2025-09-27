@@ -194,8 +194,8 @@ class ExpensesManager {
             </div>
             <style>
                 .dir-badge{padding:.25rem .5rem;border-radius:.5rem;font-size:.75rem;color:#fff;}
-                .dir-badge.withdraw{background:#dc3545}
-                .dir-badge.refund{background:#198754}
+                .dir-badge.withdraw{background:#dc3545} /* أحمر */
+                .dir-badge.refund{background:#0d6efd} /* أزرق */
             </style>
         `;
 
@@ -335,7 +335,7 @@ class ExpensesManager {
                 <td><span class="dir-badge ${r.direction}">${r.direction==='withdraw'?'سحب':'مسترجع'}</span></td>
                 <td>${r.currency}</td>
                 <td>${this.formatCurrency(r.amount, r.currency)}</td>
-                <td>${r.notes||''}</td>
+                <td>${r.direction==='withdraw' ? 'سحب مالي' : 'مسترجع مالي'}</td>
             </tr>`).join('');
 
         wrapper.innerHTML = `
@@ -415,7 +415,7 @@ class ExpensesManager {
         if(!rows.length){ this.showNotification('لا توجد بيانات للتصدير', 'warning'); return; }
         const headers = ['التاريخ','الإيصال','المساهم','الاتجاه','العملة','المبلغ','ملاحظات'];
         const csvRows = [headers.join(',')].concat(rows.map(r=>[
-            this.formatDate(r.date), r.receipt, r.shareholder, (r.direction==='withdraw'?'سحب':'مسترجع'), r.currency, r.amount, (r.notes||'')
+            this.formatDate(r.date), r.receipt, r.shareholder, (r.direction==='withdraw'?'سحب':'مسترجع'), r.currency, r.amount, (r.direction==='withdraw' ? 'سحب مالي' : 'مسترجع مالي')
         ].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')));
         const blob = new Blob([csvRows.join('\n')], {type:'text/csv;charset=utf-8;'});
         const url = URL.createObjectURL(blob);
@@ -439,7 +439,7 @@ class ExpensesManager {
                         <td>${r.direction==='withdraw'?'سحب':'مسترجع'}</td>
                         <td>${r.currency}</td>
                         <td>${r.amount}</td>
-                        <td>${r.notes||''}</td>
+                        <td>${r.direction==='withdraw' ? 'سحب مالي' : 'مسترجع مالي'}</td>
                     </tr>`).join('')}
                 </tbody>
             </table>`;
@@ -457,8 +457,33 @@ class ExpensesManager {
     printShareholderMovements(){
         const rows = this.getFilteredShareholderMovements(true);
         if(!rows.length){ this.showNotification('لا توجد بيانات للطباعة', 'warning'); return; }
+        // Build summary balances card like in the UI header
+        const selId = document.getElementById('shrMovShareholder')?.value || '';
+        const all = StorageManager.getAllData();
+        const exps = Array.isArray(all.expenses) ? all.expenses : [];
+        const filtered = exps.filter(e=> (e.accountingGuideCode==='5107') && (!!e.shareholderId) && (!selId || e.shareholderId===selId));
+        let wUSD=0,wIQD=0,rUSD=0,rIQD=0; filtered.forEach(e=>{ const u=Number(e.amountUSD)||0, i=Number(e.amountIQD)||0; if(u>0) wUSD+=u; if(i>0) wIQD+=i; if(u<0) rUSD+=Math.abs(u); if(i<0) rIQD+=Math.abs(i); });
+        const bUSD = wUSD - rUSD; const bIQD = wIQD - rIQD;
+        const summaryHTML = `
+            <div style="margin-bottom:12px;">
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <div style="flex:1;min-width:200px;border:1px solid #ddd;padding:8px;border-radius:6px;background:#f8f9fa;">
+                        <div style="color:#6c757d;font-size:12px;">سحوبات</div>
+                        <div style="font-weight:700;color:#dc3545;">${this.formatCurrency(wUSD,'USD')} / ${this.formatCurrency(wIQD,'IQD')}</div>
+                    </div>
+                    <div style="flex:1;min-width:200px;border:1px solid #ddd;padding:8px;border-radius:6px;background:#f8f9fa;">
+                        <div style="color:#6c757d;font-size:12px;">إيداعات/مسترجع</div>
+                        <div style="font-weight:700;color:#0d6efd;">${this.formatCurrency(rUSD,'USD')} / ${this.formatCurrency(rIQD,'IQD')}</div>
+                    </div>
+                    <div style="flex:1;min-width:200px;border:1px solid #ddd;padding:8px;border-radius:6px;background:#f8f9fa;">
+                        <div style="color:#6c757d;font-size:12px;">الرصيد</div>
+                        <div style="font-weight:700;"> <span style="color:${bUSD>=0?'#dc3545':'#198754'};">${this.formatCurrency(bUSD,'USD')}</span> / <span style="color:${bIQD>=0?'#dc3545':'#198754'};">${this.formatCurrency(bIQD,'IQD')}</span></div>
+                    </div>
+                </div>
+            </div>`;
         const bodyHTML = `
             <div class="print-body">
+                ${summaryHTML}
                 <table style="width:100%; border-collapse:collapse" border="1">
                     <thead><tr>
                         <th>التاريخ</th><th>الإيصال</th><th>المساهم</th><th>الاتجاه</th><th>العملة</th><th>المبلغ</th><th>ملاحظات</th>
@@ -471,7 +496,7 @@ class ExpensesManager {
                             <td>${r.direction==='withdraw'?'سحب':'مسترجع'}</td>
                             <td>${r.currency}</td>
                             <td>${this.formatCurrency(r.amount, r.currency)}</td>
-                            <td>${r.notes||''}</td>
+                            <td>${r.direction==='withdraw' ? 'سحب مالي' : 'مسترجع مالي'}</td>
                         </tr>`).join('')}
                     </tbody>
                 </table>
@@ -479,7 +504,7 @@ class ExpensesManager {
         if(window.PrintEngine && typeof PrintEngine.render==='function'){
             const html = PrintEngine.render({
                 title: 'حركة سحوبات/إيداعات المساهمين (5107)',
-                headerHTML: '',
+                headerHTML: (typeof buildBrandedHeaderHTML==='function') ? buildBrandedHeaderHTML('حركة سحوبات/إيداعات المساهمين (5107)') : '',
                 footerHTML: (typeof buildPrintFooterHTML==='function') ? buildPrintFooterHTML() : '',
                 bodyHTML,
                 orientation: 'portrait',
@@ -492,7 +517,9 @@ class ExpensesManager {
         // Fallback minimal print
         const w = window.open('', '_blank');
         if(!w) return;
-        w.document.open(); w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>حركة 5107</title></head><body>${bodyHTML}</body></html>`); w.document.close();
+        const header = (typeof buildBrandedHeaderHTML==='function') ? buildBrandedHeaderHTML('حركة سحوبات/إيداعات المساهمين (5107)') : '';
+        const footer = (typeof buildPrintFooterHTML==='function') ? buildPrintFooterHTML() : '';
+        w.document.open(); w.document.write(`<!doctype html><html lang=\"ar\" dir=\"rtl\"><head><meta charset=\"utf-8\"><title>حركة 5107</title></head><body>${header}${bodyHTML}${footer}</body></html>`); w.document.close();
         setTimeout(()=>{ try{ w.print(); }catch(_){ } }, 300);
     }
 
