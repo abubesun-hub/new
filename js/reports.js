@@ -92,7 +92,7 @@ class ReportsManager {
 
         // Calculate expenses totals
         if (data.expenses) {
-            data.expenses.forEach(entry => {
+            data.expenses.filter(e => e.accountingGuideCode !== '5107').forEach(entry => {
                 let addedUSD = false, addedIQD = false;
                 if (entry.amountUSD !== undefined) {
                     financial.expenses.USD += parseFloat(entry.amountUSD) || 0;
@@ -192,7 +192,7 @@ class ReportsManager {
         };
 
         if (data.expenses) {
-            data.expenses.forEach(entry => {
+            data.expenses.filter(e => e.accountingGuideCode !== '5107').forEach(entry => {
                 const category = entry.category || 'غير محدد';
                 const paymentMethod = entry.paymentMethod || 'غير محدد';
 
@@ -267,7 +267,7 @@ class ReportsManager {
 
         // Process expenses
         if (data.expenses) {
-            data.expenses.forEach(entry => {
+            data.expenses.filter(e => e.accountingGuideCode !== '5107').forEach(entry => {
                 const date = new Date(entry.date);
                 const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
                 if (months[monthKey]) {
@@ -295,7 +295,7 @@ class ReportsManager {
         const categories = new Map();
 
         if (data.expenses) {
-            data.expenses.forEach(entry => {
+            data.expenses.filter(e => e.accountingGuideCode !== '5107').forEach(entry => {
                 const category = entry.category || 'غير محدد';
                 if (!categories.has(category)) {
                     categories.set(category, { USD: 0, IQD: 0, count: 0 });

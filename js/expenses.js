@@ -56,8 +56,8 @@ class ExpensesManager {
                                 </li>
                                 <li class="nav-item">
                                     <a class="nav-link" href="#" onclick="expensesManager.showView('shareholders-refund')">
-                                        <i class="bi bi-cash-coin me-2"></i>مسترجع المساهمين
-                                        <span class="badge bg-info ms-2">تسوية 5107</span>
+                                        <i class="bi bi-cash-coin me-2"></i>سحوبات/إيداعات المساهمين
+                                        <span class="badge bg-info ms-2">حساب 5107</span>
                                     </a>
                                 </li>
                                 <li class="nav-item">
@@ -139,140 +139,63 @@ class ExpensesManager {
         }
     }
 
-    // View: Shareholders Refund (Settlement against 5107)
+    // View: Shareholder 5107 Movements (Withdrawals + Refunds)
     loadShareholdersRefundView() {
         const container = document.getElementById('expensesContent');
         if (!container) return;
 
         const shareholders = StorageManager.getData(StorageManager.STORAGE_KEYS.SHAREHOLDERS) || [];
-        const hasShareholders = shareholders.length > 0;
-        const reg = `RF-${StorageManager.generateRegistrationNumber()}`;
-
         const html = `
             <div class="neumorphic-card mb-3">
                 <div class="card-header d-flex align-items-center justify-content-between">
-                    <h4 class="mb-0"><i class="bi bi-cash-coin me-2"></i>مسترجع المساهمين</h4>
-                    <span class="badge bg-info">تسوية حساب 5107</span>
+                    <h4 class="mb-0"><i class="bi bi-cash-coin me-2"></i>حركة سحوبات/إيداعات المساهمين (5107)</h4>
+                    <span class="badge bg-info">لوحة عرض فقط</span>
                 </div>
                 <div class="card-body">
-                    <form id="shareholderRefundForm" class="row g-3">
-                        <div class="col-md-3">
-                            <label class="form-label"><i class="bi bi-receipt me-1"></i>رقم الوصل</label>
-                            <input type="text" id="shrRefReg" class="form-control neumorphic-input" value="${reg}" readonly>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label"><i class="bi bi-calendar3 me-1"></i>التاريخ</label>
-                            <input type="date" id="shrRefDate" class="form-control neumorphic-input" value="${new Date().toISOString().split('T')[0]}">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label"><i class="bi bi-person-badge me-1"></i>اسم المساهم</label>
-                            <select id="shrRefShareholder" class="form-control neumorphic-input" ${hasShareholders ? '' : 'disabled'}>
-                                <option value="">${hasShareholders ? 'اختر المساهم' : 'لا يوجد مساهمون (أضف من الإعدادات)'}</option>
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-4">
+                            <label class="form-label"><i class="bi bi-person-badge me-1"></i>المساهم</label>
+                            <select id="shrMovShareholder" class="form-select">
+                                <option value="">كل المساهمين</option>
                                 ${shareholders.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
                             </select>
-                            <div id="shrRefStats" class="form-text mt-2"></div>
                         </div>
-
-                        <div class="col-md-3">
-                            <label class="form-label"><i class="bi bi-currency-exchange me-1"></i>العملة</label>
-                            <select id="shrRefCurrency" class="form-control neumorphic-input">
-                                <option value="USD">دولار (USD)</option>
-                                <option value="IQD">دينار (IQD)</option>
-                            </select>
+                        <div class="col-md-4">
+                            <label class="form-label"><i class="bi bi-search me-1"></i>بحث</label>
+                            <input id="shrMovSearch" type="search" class="form-control" placeholder="بحث بالتاريخ/الوصل/الوصف">
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label"><i class="bi bi-cash-stack me-1"></i>المبلغ</label>
-                            <input type="number" id="shrRefAmount" class="form-control neumorphic-input" step="0.01" min="0" placeholder="0.00">
+                        <div class="col-md-4 text-md-end">
+                            <div class="small text-muted">السحب يظهر باللون الأحمر، والإيداع/المسترجع باللون الأخضر.</div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label"><i class="bi bi-book me-1"></i>الدليل المحاسبي</label>
-                            <input type="text" class="form-control neumorphic-input" value="5107 - سحب مالي من قبل مساهم (سحوبات المساهمين)" readonly>
-                            <div class="form-text">كل المسترجعات تُسوى على الحساب 5107 تلقائياً</div>
-                        </div>
-
-                        <div class="col-12">
-                            <label class="form-label"><i class="bi bi-card-text me-1"></i>ملاحظات</label>
-                            <textarea id="shrRefNotes" class="form-control neumorphic-input" rows="2" placeholder="وصف المسترجع (اختياري)"></textarea>
-                        </div>
-
-                        <div class="col-12 d-flex gap-2">
-                            <button type="submit" id="shrRefSubmitBtn" class="btn btn-primary neumorphic-btn"><i class="bi bi-save me-2"></i><span id="shrRefSubmitText">حفظ المسترجع</span></button>
-                            <button type="reset" class="btn btn-secondary neumorphic-btn"><i class="bi bi-arrow-clockwise me-2"></i>إعادة تعيين</button>
-                            <span id="shrRefEditBadge" class="badge bg-warning align-self-center" style="display:none"><i class="bi bi-pencil-square me-1"></i>وضع التعديل مفعل</span>
-                        </div>
-                    </form>
+                    </div>
+                    <div id="shrMovStats" class="mt-3"></div>
                 </div>
             </div>
 
             <div class="neumorphic-card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-list-ul me-2"></i>أحدث مسترجعات المساهمين</h5>
-                    <div class="d-flex gap-2 align-items-center">
-                        <input id="shrRefSearch" type="search" class="form-control form-control-sm" placeholder="بحث بالإيصال/الملاحظات/اسم المساهم" style="min-width: 260px;">
-                        <small class="text-muted">إن لم تحدد مساهماً سيتم عرض جميع المسترجعات</small>
-                    </div>
+                    <h5 class="mb-0"><i class="bi bi-list-ul me-2"></i>تفاصيل الحركة على 5107</h5>
                 </div>
                 <div class="card-body">
-                    <div id="shrRefRecent">لا توجد بيانات</div>
+                    <div id="shrMovementsTableWrapper">لا توجد بيانات</div>
                 </div>
             </div>
+            <style>
+                .dir-badge{padding:.25rem .5rem;border-radius:.5rem;font-size:.75rem;color:#fff;}
+                .dir-badge.withdraw{background:#dc3545}
+                .dir-badge.refund{background:#198754}
+            </style>
         `;
 
         container.innerHTML = html;
 
-        // Bind events
-        const form = document.getElementById('shareholderRefundForm');
-        if (form) {
-            form.addEventListener('submit', (e) => {
-                e.preventDefault();
-                this.handleSaveShareholderRefund();
-            });
-            form.addEventListener('reset', () => {
-                // regenerate receipt number on reset
-                const input = document.getElementById('shrRefReg');
-                if (input) input.value = `RF-${StorageManager.generateRegistrationNumber()}`;
-            });
-        }
+        const shSel = document.getElementById('shrMovShareholder');
+        const search = document.getElementById('shrMovSearch');
+        if (shSel) shSel.addEventListener('change', () => { this.updateShareholderMovementsStats(); this.renderShareholderMovementsTable(); });
+        if (search) search.addEventListener('input', () => this.renderShareholderMovementsTable());
 
-        const shareholderSelect = document.getElementById('shrRefShareholder');
-        if (shareholderSelect) {
-            shareholderSelect.addEventListener('change', () => {
-                this.updateShareholderRefundStats();
-                this.renderShareholderRefundsTable();
-            });
-        }
-        const searchInput = document.getElementById('shrRefSearch');
-        if (searchInput) {
-            searchInput.addEventListener('input', () => this.renderShareholderRefundsTable());
-        }
-
-        // Adjust step based on currency
-        const currencySel = document.getElementById('shrRefCurrency');
-        const amountInp = document.getElementById('shrRefAmount');
-        if (currencySel && amountInp) {
-            currencySel.addEventListener('change', () => {
-                if (currencySel.value === 'IQD') {
-                    amountInp.step = '1';
-                    amountInp.placeholder = '0';
-                    // Ensure whole numbers for IQD
-                    const v = Number(amountInp.value || 0);
-                    if (!Number.isNaN(v)) amountInp.value = String(Math.round(v));
-                } else {
-                    amountInp.step = '0.01';
-                    amountInp.placeholder = '0.00';
-                }
-            });
-            // When typing IQD, keep it as integer
-            amountInp.addEventListener('input', () => {
-                if (currencySel.value === 'IQD') {
-                    const v = Number(amountInp.value || 0);
-                    if (!Number.isNaN(v)) amountInp.value = String(Math.round(v));
-                }
-            });
-        }
-
-        // Initial render (show all latest by default)
-        this.renderShareholderRefundsTable();
+        this.updateShareholderMovementsStats();
+        this.renderShareholderMovementsTable();
     }
 
     // Compute and render stats for selected shareholder
@@ -333,6 +256,108 @@ class ExpensesManager {
             balanceUSD: withdrawUSD - refundUSD,
             balanceIQD: withdrawIQD - refundIQD
         };
+    }
+
+    // Update stats (summary) for selected shareholder or all
+    updateShareholderMovementsStats(){
+        const statsDiv = document.getElementById('shrMovStats');
+        const sel = document.getElementById('shrMovShareholder');
+        if(!statsDiv) return;
+        const shareholderId = sel?.value || '';
+
+        const data = StorageManager.getAllData();
+        const exps = Array.isArray(data.expenses) ? data.expenses : [];
+        const shs = StorageManager.getData(StorageManager.STORAGE_KEYS.SHAREHOLDERS) || [];
+
+        // Filter 5107 entries with shareholderId
+        const filtered = exps.filter(e => e.accountingGuideCode==='5107' && (!!e.shareholderId) && (!shareholderId || e.shareholderId===shareholderId));
+        // Aggregate
+        let wUSD=0,wIQD=0,rUSD=0,rIQD=0;
+        filtered.forEach(e=>{
+            const aUSD=Number(e.amountUSD)||0; const aIQD=Number(e.amountIQD)||0;
+            if(aUSD>0) wUSD+=aUSD; if(aIQD>0) wIQD+=aIQD;
+            if(aUSD<0) rUSD+=Math.abs(aUSD); if(aIQD<0) rIQD+=Math.abs(aIQD);
+        });
+        const bUSD = wUSD - rUSD; const bIQD = wIQD - rIQD;
+        const title = shareholderId ? (shs.find(s=>s.id===shareholderId)?.name || 'غير محدد') : 'كل المساهمين';
+        statsDiv.innerHTML = `
+            <div class="row g-3">
+                <div class="col-md-3"><div class="p-3 border rounded bg-light"><div class="text-muted small">المساهم</div><div class="fw-bold">${title}</div></div></div>
+                <div class="col-md-3"><div class="p-3 border rounded bg-light"><div class="text-muted small">سحوبات</div><div class="fw-bold">${this.formatCurrency(wUSD,'USD')} <span class="text-muted">/</span> ${this.formatCurrency(wIQD,'IQD')}</div></div></div>
+                <div class="col-md-3"><div class="p-3 border rounded bg-light"><div class="text-muted small">إيداعات/مسترجع</div><div class="fw-bold">${this.formatCurrency(rUSD,'USD')} <span class="text-muted">/</span> ${this.formatCurrency(rIQD,'IQD')}</div></div></div>
+                <div class="col-md-3"><div class="p-3 border rounded bg-light"><div class="text-muted small">الرصيد</div><div class="fw-bold"><span class="text-${bUSD>=0?'danger':'success'}">${this.formatCurrency(bUSD,'USD')}</span> <span class="text-muted">/</span> <span class="text-${bIQD>=0?'danger':'success'}">${this.formatCurrency(bIQD,'IQD')}</span></div></div></div>
+            </div>`;
+    }
+
+    // Render detailed movements table for 5107
+    renderShareholderMovementsTable(){
+        const wrapper = document.getElementById('shrMovementsTableWrapper');
+        if(!wrapper) return;
+        const shareholderId = document.getElementById('shrMovShareholder')?.value || '';
+        const q = (document.getElementById('shrMovSearch')?.value || '').trim().toLowerCase();
+        const shs = StorageManager.getData(StorageManager.STORAGE_KEYS.SHAREHOLDERS) || [];
+        const exps = StorageManager.getData(StorageManager.STORAGE_KEYS.EXPENSES) || [];
+
+        const rows = exps
+            .filter(e => e.accountingGuideCode==='5107' && (!!e.shareholderId))
+            .filter(e => !shareholderId || e.shareholderId===shareholderId)
+            .map(e=>{
+                const usd=Number(e.amountUSD)||0, iqd=Number(e.amountIQD)||0; const useUSD = Math.abs(usd) >= Math.abs(iqd);
+                const amt = useUSD ? usd : iqd; const cur = useUSD ? 'USD' : 'IQD';
+                const dir = amt>=0 ? 'withdraw' : 'refund';
+                const absAmt = Math.abs(amt);
+                const sh = shs.find(s=>s.id===e.shareholderId);
+                return {
+                    date: e.date,
+                    createdAt: e.createdAt,
+                    receipt: e.receiptNumber || e.registrationNumber || '-',
+                    shareholder: sh?.name || '-',
+                    notes: e.notes || e.description || '',
+                    currency: cur,
+                    amount: absAmt,
+                    direction: dir
+                };
+            })
+            .filter(r => {
+                if(!q) return true;
+                return (
+                    (r.receipt||'').toLowerCase().includes(q) ||
+                    (r.notes||'').toLowerCase().includes(q) ||
+                    (r.shareholder||'').toLowerCase().includes(q)
+                );
+            })
+            .sort((a,b)=> new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date));
+
+        if(rows.length===0){ wrapper.innerHTML = '<div class="text-muted">لا توجد حركات مسجلة.</div>'; return; }
+
+        const body = rows.slice(0,200).map(r=>`
+            <tr>
+                <td>${this.formatDate(r.date)}</td>
+                <td>${r.receipt}</td>
+                <td>${r.shareholder}</td>
+                <td><span class="dir-badge ${r.direction}">${r.direction==='withdraw'?'سحب':'مسترجع'}</span></td>
+                <td>${r.currency}</td>
+                <td>${this.formatCurrency(r.amount, r.currency)}</td>
+                <td>${r.notes||''}</td>
+            </tr>`).join('');
+
+        wrapper.innerHTML = `
+            <div class="table-responsive">
+                <table class="table table-sm table-striped align-middle">
+                    <thead>
+                        <tr>
+                            <th>التاريخ</th>
+                            <th>الإيصال</th>
+                            <th>المساهم</th>
+                            <th>الاتجاه</th>
+                            <th>العملة</th>
+                            <th>المبلغ</th>
+                            <th>ملاحظات</th>
+                        </tr>
+                    </thead>
+                    <tbody>${body}</tbody>
+                </table>
+            </div>`;
     }
 
     // Save refund entry as a negative expense on 5107 (new model) and refresh UI
@@ -2985,6 +3010,22 @@ class ExpensesManager {
                             <div class="form-text text-muted">سيظهر هذا الحقل فقط عند اختيار الحساب 5107: سحب مالي من قبل مساهم</div>
                         </div>
 
+                        <!-- اتجاه العملية (يظهر فقط عند اختيار 5107) -->
+                        <div class="col-md-6 mb-3" id="expenseShareholderDirectionRow" style="display:none;">
+                            <label class="form-label"><i class="bi bi-arrow-left-right me-1"></i>نوع العملية لحساب سحوبات المساهمين (5107)</label>
+                            <div class="d-flex gap-3 align-items-center">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="shareholderDirection" id="directionWithdraw" value="withdraw" checked>
+                                    <label class="form-check-label" for="directionWithdraw">سحب من الشركة (مدين)</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="shareholderDirection" id="directionRefund" value="refund">
+                                    <label class="form-check-label" for="directionRefund">استرجاع/إيداع للشركة (دائن)</label>
+                                </div>
+                            </div>
+                            <div class="form-text text-muted">عند اختيار "استرجاع" سيتم تسجيل المبلغ كسالب على نفس الحساب 5107 لخفض الرصيد.</div>
+                        </div>
+
                         <!-- المستفيد ومعلومات الوصل -->
                         <div class="col-md-4 mb-3">
                             <label for="expenseBeneficiary" class="form-label">
@@ -3115,7 +3156,8 @@ class ExpensesManager {
     // Load categories view with detailed reports
     loadCategoriesView() {
         const data = StorageManager.getAllData();
-        const expenses = data.expenses || [];
+        // Exclude shareholder withdrawals/refunds account (5107) from operating expense categories
+        const expenses = (data.expenses || []).filter(e => e.accountingGuideCode !== '5107');
         
         // Calculate detailed category statistics
         const categoryStats = this.calculateDetailedCategoryStats(expenses);
@@ -3750,6 +3792,7 @@ class ExpensesManager {
                                     <div class="list-group-item">
                                         <small>${exp.description || 'بدون وصف'}</small>
                                         <span class="float-end">${this.formatCurrency(exp.amount, exp.currency)}</span>
+                                        ${exp.accountingGuideCode==='5107' ? `<span class="badge ms-2 ${((parseFloat(exp.amountUSD||0)<0)||(parseFloat(exp.amountIQD||0)<0))?'bg-success':'bg-danger'}">${((parseFloat(exp.amountUSD||0)<0)||(parseFloat(exp.amountIQD||0)<0))?'مسترجع':'سحب'}</span>` : ''}
                                     </div>
                                 `).join('')}
                                 ${categoryExpenses.length > 3 ? `<div class="list-group-item text-center"><small>و ${categoryExpenses.length - 3} مصروف آخر...</small></div>` : ''}
@@ -4154,6 +4197,7 @@ class ExpensesManager {
                     <div>
                         <h6 class="mb-1">${this.formatCurrency(expense.amount, expense.currency)}</h6>
                         <small class="text-muted">${expense.category || 'غير محدد'}</small>
+                        ${expense.accountingGuideCode==='5107' ? `<span class="badge ms-2 ${((parseFloat(expense.amountUSD||0)<0)||(parseFloat(expense.amountIQD||0)<0))?'bg-success':'bg-danger'}">${((parseFloat(expense.amountUSD||0)<0)||(parseFloat(expense.amountIQD||0)<0))?'مسترجع':'سحب'}</span>` : ''}
                         <br>
                         <small class="text-muted">${this.formatDate(expense.date)}</small>
                     </div>
@@ -4206,10 +4250,11 @@ class ExpensesManager {
         });
 
         // Auto-select category when accounting guide changes + toggle حقل المساهم
-        const accountingGuideSelect = document.getElementById('expenseAccountingGuide');
-        const categorySelect = document.getElementById('expenseCategory');
-        const shareholderRow = document.getElementById('expenseShareholderRow');
-        const shareholderSelect = document.getElementById('expenseShareholder');
+    const accountingGuideSelect = document.getElementById('expenseAccountingGuide');
+    const categorySelect = document.getElementById('expenseCategory');
+    const shareholderRow = document.getElementById('expenseShareholderRow');
+    const shareholderSelect = document.getElementById('expenseShareholder');
+    const directionRow = document.getElementById('expenseShareholderDirectionRow');
         if (accountingGuideSelect && categorySelect){
             accountingGuideSelect.addEventListener('change', () => {
                 const guideId = accountingGuideSelect.value;
@@ -4233,7 +4278,18 @@ class ExpensesManager {
                     const selectedOption = accountingGuideSelect.options[accountingGuideSelect.selectedIndex];
                     const code = selectedOption?.getAttribute('data-code');
                     if (code === '5107') {
+                        // Disable manual category editing and auto-pick based on direction
+                        if (categorySelect) {
+                            // ensure both special categories exist
+                            const ensureCat = (val)=>{ if(!Array.from(categorySelect.options).some(o=>o.value===val)){ const o=document.createElement('option'); o.value=val; o.textContent=val; categorySelect.appendChild(o);} };
+                            ensureCat('سحوبات المساهمين');
+                            ensureCat('مسترجعات المساهمين');
+                            const dir = (document.querySelector('input[name="shareholderDirection"]:checked')?.value) || 'withdraw';
+                            categorySelect.value = (dir === 'refund') ? 'مسترجعات المساهمين' : 'سحوبات المساهمين';
+                            categorySelect.disabled = true;
+                        }
                         if (shareholderRow) shareholderRow.style.display = '';
+                        if (directionRow) directionRow.style.display = '';
                         if (shareholderSelect) {
                             const shareholders = StorageManager.getData(StorageManager.STORAGE_KEYS.SHAREHOLDERS) || [];
                             const curr = shareholderSelect.value;
@@ -4256,10 +4312,25 @@ class ExpensesManager {
                                     beneficiaryInput.value = (opt && opt.value) ? opt.text : '';
                                 };
                             }
+                            // Update category when direction changes (only for 5107)
+                            const onDirChange = ()=>{
+                                if (!categorySelect) return;
+                                const dir = (document.querySelector('input[name="shareholderDirection"]:checked')?.value) || 'withdraw';
+                                categorySelect.value = (dir === 'refund') ? 'مسترجعات المساهمين' : 'سحوبات المساهمين';
+                            };
+                            try {
+                                document.querySelectorAll('input[name="shareholderDirection"]').forEach(inp=>{
+                                    inp.removeEventListener('change', onDirChange);
+                                    inp.addEventListener('change', onDirChange);
+                                });
+                            } catch(_){ }
                         }
                     } else {
                         if (shareholderRow) shareholderRow.style.display = 'none';
+                        if (directionRow) directionRow.style.display = 'none';
                         if (shareholderSelect) { shareholderSelect.required = false; shareholderSelect.value = ''; }
+                        // Re-enable category editing for non-5107
+                        if (categorySelect) categorySelect.disabled = false;
                         // أعد تمكين تحرير المستفيد عند عدم اختيار 5107
                         const beneficiaryInput = document.getElementById('expenseBeneficiary');
                         if (beneficiaryInput) beneficiaryInput.readOnly = false;
@@ -4281,17 +4352,34 @@ class ExpensesManager {
         const accountingGuideCode = selectedOption?.getAttribute('data-code') || '';
         const accountingGuideName = selectedOption?.getAttribute('data-name') || '';
         const shareholderId = document.getElementById('expenseShareholder')?.value || '';
+        const shareholderDirection = (document.querySelector('input[name="shareholderDirection"]:checked')?.value) || 'withdraw';
         let shareholderName = '';
         if (shareholderId) {
             const shareholders = StorageManager.getData(StorageManager.STORAGE_KEYS.SHAREHOLDERS) || [];
             shareholderName = shareholders.find(s=>s.id===shareholderId)?.name || '';
         }
 
+        // Normalize amounts and category for account 5107 based on direction (withdraw vs refund)
+        let _normUSD = formData.amountUSD;
+        let _normIQD = formData.amountIQD;
+        let _normCategory = formData.category;
+        if (accountingGuideCode === '5107') {
+            if (shareholderDirection === 'refund') {
+                _normUSD = -Math.abs(formData.amountUSD || 0);
+                _normIQD = -Math.abs(formData.amountIQD || 0);
+                _normCategory = 'مسترجعات المساهمين';
+            } else {
+                _normUSD = Math.abs(formData.amountUSD || 0);
+                _normIQD = Math.abs(formData.amountIQD || 0);
+                _normCategory = 'سحوبات المساهمين';
+            }
+        }
+
         const expenseData = {
             registrationNumber: formData.registrationNumber,
             date: formData.date,
-            amountIQD: formData.amountIQD,
-            amountUSD: formData.amountUSD,
+            amountIQD: _normIQD,
+            amountUSD: _normUSD,
             exchangeRate: formData.exchangeRate,
             description: formData.description,
             accountingGuide: formData.accountingGuide,
@@ -4300,19 +4388,19 @@ class ExpensesManager {
             receiptDate: formData.receiptDate,
             vendor: formData.vendor,
             paymentMethod: formData.paymentMethod,
-            category: formData.category,
+            category: _normCategory,
             project: formData.project,
             notes: formData.notes,
             shareholderId,
             shareholderName,
             // Legacy fields for compatibility - determine primary currency based on larger amount
-            currency: this.determinePrimaryCurrency(formData.amountIQD, formData.amountUSD, formData.exchangeRate),
-            amount: this.calculatePrimaryAmount(formData.amountIQD, formData.amountUSD, formData.exchangeRate),
+            currency: this.determinePrimaryCurrency(_normIQD, _normUSD, formData.exchangeRate),
+            amount: this.calculatePrimaryAmount(_normIQD, _normUSD, formData.exchangeRate),
             
             // Enhanced currency information
-            hasBothCurrencies: formData.amountIQD > 0 && formData.amountUSD > 0,
-            hasIQDOnly: formData.amountIQD > 0 && formData.amountUSD === 0,
-            hasUSDOnly: formData.amountIQD === 0 && formData.amountUSD > 0
+            hasBothCurrencies: (Math.abs(_normIQD) > 0) && (Math.abs(_normUSD) > 0),
+            hasIQDOnly: (Math.abs(_normIQD) > 0) && (Math.abs(_normUSD) === 0),
+            hasUSDOnly: (Math.abs(_normIQD) === 0) && (Math.abs(_normUSD) > 0)
         };
 
         if (this.editingId) {
@@ -4708,6 +4796,10 @@ class ExpensesManager {
                     <div class="info-row">
                         <span class="info-label">المساهم:</span>
                         <span class="info-value">${entry.shareholderName || 'غير محدد'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">الاتجاه:</span>
+                        <span class="info-value"><span class="badge ${((parseFloat(entry.amountUSD||0)<0)||(parseFloat(entry.amountIQD||0)<0))?'bg-success':'bg-danger'}">${((parseFloat(entry.amountUSD||0)<0)||(parseFloat(entry.amountIQD||0)<0))?'مسترجع':'سحب'}</span></span>
                     </div>
                     ` : ''}
 
@@ -5364,6 +5456,7 @@ class ExpensesManager {
         const project = document.getElementById('expenseProject')?.value;
         const notes = document.getElementById('expenseNotes')?.value;
         const shareholderId = document.getElementById('expenseShareholder')?.value || '';
+        const shareholderDirection = (document.querySelector('input[name="shareholderDirection"]:checked')?.value) || 'withdraw';
         let shareholderName = '';
         if (shareholderId) {
             const shareholders = StorageManager.getData(StorageManager.STORAGE_KEYS.SHAREHOLDERS) || [];
@@ -5414,7 +5507,8 @@ class ExpensesManager {
             project,
             notes,
             shareholderId,
-            shareholderName
+            shareholderName,
+            shareholderDirection
         };
     }
 
@@ -5582,7 +5676,7 @@ class ExpensesManager {
     // Show detailed category information
     showCategoryDetails(categoryName) {
         const data = StorageManager.getAllData();
-        const expenses = data.expenses || [];
+        const expenses = (data.expenses || []).filter(e => e.accountingGuideCode !== '5107');
         const categoryExpenses = expenses.filter(exp => (exp.category || 'غير مصنف') === categoryName);
         
         if (categoryExpenses.length === 0) {
@@ -5650,8 +5744,8 @@ class ExpensesManager {
                                     <td><strong>${expense.registrationNumber || 'غير محدد'}</strong></td>
                                     <td>${this.formatDate(expense.date)}</td>
                                     <td>${expense.description || 'بدون وصف'}</td>
-                                    <td>${expense.amountUSD > 0 ? this.formatCurrency(expense.amountUSD, 'USD') : '<span class="text-muted">-</span>'}</td>
-                                    <td>${expense.amountIQD > 0 ? this.formatCurrency(expense.amountIQD, 'IQD') : '<span class="text-muted">-</span>'}</td>
+                                    <td>${expense.amountUSD ? this.formatCurrency(expense.amountUSD, 'USD') : '<span class="text-muted">-</span>'}</td>
+                                    <td>${expense.amountIQD ? this.formatCurrency(expense.amountIQD, 'IQD') : '<span class="text-muted">-</span>'}</td>
                                     <td>${expense.beneficiary || '<span class="text-muted">غير محدد</span>'}</td>
                                     <td>${expense.project || '<span class="text-muted">غير محدد</span>'}</td>
                                     <td>
@@ -5663,6 +5757,7 @@ class ExpensesManager {
                                                 <i class="bi bi-printer"></i>
                                             </button>
                                         </div>
+                                        ${expense.accountingGuideCode==='5107' ? `<div><span class="badge ms-2 ${((parseFloat(expense.amountUSD||0)<0)||(parseFloat(expense.amountIQD||0)<0))?'bg-success':'bg-danger'}">${((parseFloat(expense.amountUSD||0)<0)||(parseFloat(expense.amountIQD||0)<0))?'مسترجع':'سحب'}</span></div>`: ''}
                                     </td>
                                 </tr>
                             `).join('')}
@@ -5714,7 +5809,7 @@ class ExpensesManager {
     sortCategories() {
         const sortBy = document.getElementById('categoriesSortBy').value;
         const data = StorageManager.getAllData();
-        const expenses = data.expenses || [];
+        const expenses = (data.expenses || []).filter(e => e.accountingGuideCode !== '5107');
         const categoryStats = this.calculateDetailedCategoryStats(expenses);
         
         // Sort the statistics
@@ -5747,7 +5842,7 @@ class ExpensesManager {
     changeCategoriesViewMode() {
         const viewMode = document.getElementById('categoriesViewMode').value;
         const data = StorageManager.getAllData();
-        const expenses = data.expenses || [];
+        const expenses = (data.expenses || []).filter(e => e.accountingGuideCode !== '5107');
         const categoryStats = this.calculateDetailedCategoryStats(expenses);
         
         let content = '';
