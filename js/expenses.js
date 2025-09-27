@@ -3577,22 +3577,44 @@ class ExpensesManager {
         }
 
         const rows = expenses.map(e => {
-            const usdTxt = (e.amountUSD && e.amountUSD > 0) ? this.formatCurrency(e.amountUSD, 'USD') : '<span class="text-muted">-</span>';
-            const iqdTxt = (e.amountIQD && e.amountIQD > 0) ? this.formatCurrency(e.amountIQD, 'IQD') : '<span class="text-muted">-</span>';
+            // Amount rendering with sign and colors; never leave negatives blank
+            const usdAmt = Number(e.amountUSD || 0);
+            const iqdAmt = Number(e.amountIQD || 0);
+            const usdTxt = usdAmt === 0
+                ? '<span class="text-muted">-</span>'
+                : (usdAmt > 0
+                    ? `<span class="text-success">${this.formatCurrency(usdAmt, 'USD')}</span>`
+                    : `<span class="text-danger">-${this.formatCurrency(Math.abs(usdAmt), 'USD')}</span>`);
+            const iqdTxt = iqdAmt === 0
+                ? '<span class="text-muted">-</span>'
+                : (iqdAmt > 0
+                    ? `<span class="text-success">${this.formatCurrency(iqdAmt, 'IQD')}</span>`
+                    : `<span class="text-danger">-${this.formatCurrency(Math.abs(iqdAmt), 'IQD')}</span>`);
+
+            // Beneficiary display: avoid showing receipt number; prefer shareholderName for 5107
+            const beneficiaryDisplay = (() => {
+                const rec = (e.receiptNumber || '').toString().trim();
+                const ben = (e.beneficiary || '').toString().trim();
+                if ((e.accountingGuideCode === '5107') && e.shareholderName) return e.shareholderName;
+                if (ben && ben !== rec) return ben;
+                if (e.shareholderName) return e.shareholderName;
+                if (e.vendor) return e.vendor;
+                return '<span class="text-muted">-</span>';
+            })();
+
             const badge = this.getTransactionTypeDescription(e.amountIQD||0, e.amountUSD||0);
             return `
                 <tr>
                     <td><strong>${e.registrationNumber || ''}</strong><br><small class="text-muted">${this.formatDate(e.date)}</small></td>
                     <td>${e.description || 'بدون وصف'}<div class="mt-1">${badge}</div></td>
-                    <td class="text-success">${usdTxt}</td>
-                    <td class="text-info">${iqdTxt}</td>
+                    <td>${usdTxt}</td>
+                    <td>${iqdTxt}</td>
                     <td>${e.category || '<span class="text-muted">غير محدد</span>'}</td>
-                    <td>${e.beneficiary || '<span class="text-muted">-</span>'}</td>
+                    <td>${beneficiaryDisplay}</td>
                     <td>
                         <div class="btn-group btn-group-sm">
                             <button class="btn btn-outline-primary" title="تعديل" onclick="expensesManager.startEditExpense('${e.id}')"><i class="bi bi-pencil"></i></button>
                             <button class="btn btn-outline-success" title="طباعة" onclick="expensesManager.printExpenseById('${e.id}','${e.registrationNumber||''}')"><i class="bi bi-printer"></i></button>
-                            <button class="btn btn-outline-secondary" title="تكرار" onclick="expensesManager.duplicateExpense('${e.id}')"><i class="bi bi-copy"></i></button>
                             <button class="btn btn-outline-danger" title="حذف" onclick="expensesManager.deleteExpense('${e.id}')"><i class="bi bi-trash"></i></button>
                         </div>
                     </td>
@@ -3686,27 +3708,7 @@ class ExpensesManager {
         }
     }
 
-    // Duplicate an expense
-    duplicateExpense(id) {
-        try {
-            const all = StorageManager.getAllData();
-            const entry = (all.expenses || []).find(e => e.id === id);
-            if (!entry) return this.showNotification('القيد غير موجود', 'error');
-            // Prepare copy without identifiers/timestamps
-            const { id: _id, registrationNumber: _r, createdAt: _c, updatedAt: _u, ...payload } = entry;
-            const newEntry = StorageManager.addExpenseEntry(payload);
-            if (newEntry) {
-                this.showNotification('تم تكرار القيد بنجاح', 'success');
-                const refreshed = StorageManager.getAllData().expenses || [];
-                this.renderEditTable(this.getFilteredExpenses(refreshed));
-            } else {
-                this.showNotification('تعذر تكرار القيد', 'error');
-            }
-        } catch (err) {
-            console.error('duplicateExpense error', err);
-            this.showNotification('حدث خطأ أثناء تكرار القيد', 'error');
-        }
-    }
+    
 
     // Load search view (placeholder)
     loadSearchView() {
