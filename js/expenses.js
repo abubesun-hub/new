@@ -4493,13 +4493,29 @@ class ExpensesManager {
                             const updateShareholderBalanceInfo = () => {
                                 if (!balDiv) return;
                                 const selVal = shareholderSelect.value || '';
-                                if (!selVal){ balDiv.style.display = 'none'; balDiv.innerHTML = ''; return; }
+                                const refundRadio = document.getElementById('directionRefund');
+                                const withdrawRadio = document.getElementById('directionWithdraw');
+                                if (!selVal){ 
+                                    // لا يوجد مساهم محدد: امنع الاسترجاع مؤقتًا
+                                    if (refundRadio) { refundRadio.disabled = true; refundRadio.title = 'اختر اسم المساهم أولًا'; }
+                                    if (withdrawRadio && withdrawRadio.checked === false) { withdrawRadio.checked = true; }
+                                    balDiv.style.display = 'none'; 
+                                    balDiv.innerHTML = ''; 
+                                    return; 
+                                }
                                 const totals = (typeof expensesManager.computeShareholderWithdrawRefundTotals === 'function') ? expensesManager.computeShareholderWithdrawRefundTotals(selVal) : null;
                                 if (!totals){ balDiv.style.display = 'none'; balDiv.innerHTML = ''; return; }
                                 const usd = Number(totals.balanceUSD||0);
                                 const iqd = Number(totals.balanceIQD||0);
                                 const usdColor = usd >= 0 ? 'danger' : 'success';
                                 const iqdColor = iqd >= 0 ? 'danger' : 'success';
+                                // تمكين/تعطيل خيار الاسترجاع حسب الرصيد
+                                const isZero = (Math.abs(usd) === 0 && Math.abs(iqd) === 0);
+                                if (refundRadio) {
+                                    refundRadio.disabled = !!isZero;
+                                    refundRadio.title = isZero ? 'لا يمكن تسجيل مسترجع/إيداع لأن رصيد المساهم صفر' : '';
+                                    if (isZero && withdrawRadio) withdrawRadio.checked = true;
+                                }
                                 balDiv.innerHTML = `
                                     <div class="d-flex flex-wrap align-items-center gap-2">
                                         <span class="badge bg-light text-dark">
@@ -4535,6 +4551,9 @@ class ExpensesManager {
                         if (shareholderSelect) { shareholderSelect.required = false; shareholderSelect.value = ''; }
                         const balDiv = document.getElementById('shareholderBalanceInfo');
                         if (balDiv){ balDiv.style.display = 'none'; balDiv.innerHTML = ''; }
+                        // أعد تمكين خيار الاسترجاع افتراضيًا عند الخروج من 5107
+                        const refundRadio = document.getElementById('directionRefund');
+                        if (refundRadio){ refundRadio.disabled = false; refundRadio.title = ''; }
                         // Re-enable category editing for non-5107
                         if (categorySelect) categorySelect.disabled = false;
                         // أعد تمكين تحرير المستفيد عند عدم اختيار 5107
@@ -4570,6 +4589,20 @@ class ExpensesManager {
         let _normIQD = formData.amountIQD;
         let _normCategory = formData.category;
         if (accountingGuideCode === '5107') {
+            // تحقق من رصيد المساهم قبل السماح بالاسترجاع/الإيداع
+            if (shareholderDirection === 'refund') {
+                if (!shareholderId) {
+                    this.showNotification('يرجى اختيار اسم المساهم قبل تسجيل مسترجع/إيداع', 'error');
+                    return;
+                }
+                const totals = this.computeShareholderWithdrawRefundTotals(shareholderId);
+                const usd = Number(totals.balanceUSD||0);
+                const iqd = Number(totals.balanceIQD||0);
+                if (Math.abs(usd) === 0 && Math.abs(iqd) === 0) {
+                    this.showNotification('لا يمكن تسجيل مسترجع/إيداع لأن رصيد هذا المساهم صفر، يمكنك فقط تسجيل سحب.', 'error');
+                    return;
+                }
+            }
             if (shareholderDirection === 'refund') {
                 _normUSD = -Math.abs(formData.amountUSD || 0);
                 _normIQD = -Math.abs(formData.amountIQD || 0);
