@@ -3682,7 +3682,11 @@ class ExpensesManager {
         set('expenseExchangeRate', e.exchangeRate ?? '1500');
         set('expenseDescription', e.description || '');
         set('expenseAccountingGuide', e.accountingGuide || '');
-        set('expenseBeneficiary', e.beneficiary || '');
+        // For 5107 entries, prefer shareholderName as beneficiary if beneficiary is missing
+        const ben = (e.accountingGuideCode === '5107')
+            ? (e.beneficiary || e.shareholderName || '')
+            : (e.beneficiary || '');
+        set('expenseBeneficiary', ben);
         set('expenseReceiptNumber', e.receiptNumber || '');
         set('expenseReceiptDate', e.receiptDate ? e.receiptDate.split('T')[0] : '');
         set('expenseVendor', e.vendor || '');
@@ -4854,6 +4858,11 @@ class ExpensesManager {
             : (amountIQD || parseFloat(entry.amount || 0) || 0);
         const currencyDisplay = primaryCurrency === 'USD' ? 'دولار أمريكي (USD)' : 'دينار عراقي (IQD)';
 
+        // Prefer shareholder name as beneficiary for 5107 entries
+        const beneficiaryDisplay = (entry.accountingGuideCode === '5107')
+            ? (entry.shareholderName || entry.beneficiary || 'غير محدد')
+            : (entry.beneficiary || 'غير محدد');
+
         return `
         <!DOCTYPE html>
         <html lang="ar" dir="rtl">
@@ -5030,7 +5039,7 @@ class ExpensesManager {
 
                     <div class="info-row">
                         <span class="info-label">المستفيد:</span>
-                        <span class="info-value">${entry.beneficiary || 'غير محدد'}</span>
+                        <span class="info-value">${beneficiaryDisplay}</span>
                     </div>
 
                     ${entry.accountingGuideCode === '5107' ? `
@@ -5641,6 +5650,10 @@ class ExpensesManager {
             document.querySelector('.neumorphic-card').insertAdjacentHTML('afterend', previewHTML);
         }
 
+        const beneficiaryDisplay = (formData.accountingGuideCode === '5107')
+            ? (formData.shareholderName || formData.beneficiary || 'غير محدد')
+            : (formData.beneficiary || 'غير محدد');
+
         const previewContent = `
             <div class="row">
                 <div class="col-md-6">
@@ -5648,7 +5661,7 @@ class ExpensesManager {
                         <tr><td><strong>رقم القيد:</strong></td><td>${formData.registrationNumber}</td></tr>
                         <tr><td><strong>التاريخ:</strong></td><td>${this.formatDate(formData.date)}</td></tr>
                         <tr><td><strong>البيان:</strong></td><td>${formData.description}</td></tr>
-                        <tr><td><strong>المستفيد:</strong></td><td>${formData.beneficiary || 'غير محدد'}</td></tr>
+                        <tr><td><strong>المستفيد:</strong></td><td>${beneficiaryDisplay}</td></tr>
                         <tr><td><strong>المورد:</strong></td><td>${formData.vendor || 'غير محدد'}</td></tr>
                         ${formData.accountingGuideCode==='5107' ? ('<tr><td><strong>المساهم:</strong></td><td>' + (formData.shareholderName || 'غير محدد') + '</td></tr>') : ''}
                     </table>
